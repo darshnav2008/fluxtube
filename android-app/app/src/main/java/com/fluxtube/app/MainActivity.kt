@@ -61,6 +61,11 @@ class MainActivity : AppCompatActivity() {
                 FFmpeg.getInstance().init(applicationContext)
                 engineReady = true
                 callJs("window.onEngineStatus(true, 'Engine Ready')")
+                // Quietly check for yt-dlp updates in background
+                try {
+                    YoutubeDL.getInstance().updateYoutubeDL(applicationContext)
+                } catch (_: Exception) {
+                }
             } catch (e: Exception) {
                 val msg = (e.message ?: "Init failed").replace("'", "")
                 callJs("window.onEngineStatus(false, '$msg')")
@@ -243,6 +248,9 @@ class MainActivity : AppCompatActivity() {
 
                     val req = YoutubeDLRequest(url)
                     req.addOption("--no-playlist")
+                    req.addOption("--force-ipv4")
+                    req.addOption("--no-warnings")
+                    req.addOption("--extractor-args", "youtube:player_client=android,web")
                     req.addOption("-o", "${outDir.absolutePath}/%(title).80s.%(ext)s")
 
                     when (qualityId) {
