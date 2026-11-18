@@ -10,7 +10,9 @@
     <application
         android:allowBackup="true"
         android:extractNativeLibs="true"
-        android:label="FLUXTUBE"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="Fluxtube"
         android:supportsRtl="true"
         android:theme="@style/Theme.FluxTube"
         android:usesCleartextTraffic="true">

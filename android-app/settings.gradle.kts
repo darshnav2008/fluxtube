@@ -15,5 +15,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "FLUXTUBE"
+rootProject.name = "Fluxtube"
 include(":app")
