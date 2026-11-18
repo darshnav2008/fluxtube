@@ -60,15 +60,7 @@
         </button>
       </nav>
 
-      <div class="topbar-actions">
-        <button class="pro-btn" id="openPayBtn" type="button">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="8" r="4"></circle>
-            <path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"></path>
-          </svg>
-          <span id="proBtnLabel">Go Pro • ₹199</span>
-        </button>
-      </div>
+      <div class="topbar-actions"></div>
     </div>
   </header>
 
@@ -302,67 +294,6 @@
   </aside>
   <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
 
-  <!-- Payment Gateway Modal -->
-  <div class="pay-modal-backdrop" id="payModalBackdrop" hidden>
-    <div class="pay-modal" role="dialog" aria-modal="true" aria-labelledby="payModalTitle">
-      <div class="pay-modal-header">
-        <div>
-          <span class="pay-kicker">FLUXTUBE CHECKOUT</span>
-          <h3 id="payModalTitle">Unlock Studio Pro</h3>
-        </div>
-        <button type="button" class="btn-close-drawer" id="closePayBtn">✕</button>
-      </div>
-
-      <div class="plan-grid">
-        <button type="button" class="plan-card selected" data-plan="pro_monthly" data-amount="199">
-          <span class="plan-name">Pro Pass</span>
-          <span class="plan-price">₹199<small>/mo</small></span>
-          <span class="plan-desc">Priority 4K60 + Batch</span>
-        </button>
-        <button type="button" class="plan-card" data-plan="supporter" data-amount="99">
-          <span class="plan-name">Supporter</span>
-          <span class="plan-price">₹99<small> once</small></span>
-          <span class="plan-desc">Creator Tip Pack</span>
-        </button>
-      </div>
-
-      <div class="pay-method-tabs">
-        <button type="button" class="pay-tab active" data-method="upi">UPI / QR</button>
-        <button type="button" class="pay-tab" data-method="card">Credit / Debit Card</button>
-      </div>
-
-      <form id="paymentForm" class="pay-form">
-        <div id="upiFields">
-          <label class="pay-label" for="upiInput">UPI ID</label>
-          <input type="text" id="upiInput" class="pay-input" placeholder="yourname@okaxis" value="creator@upi" required />
-          <div class="upi-apps">
-            <span>GPay</span><span>PhonePe</span><span>Paytm</span><span>BHIM</span>
-          </div>
-        </div>
-
-        <div id="cardFields" hidden>
-          <label class="pay-label" for="cardNumInput">CARD NUMBER</label>
-          <input type="text" id="cardNumInput" class="pay-input" placeholder="4242 •••• •••• 4242" maxlength="19" />
-          <div class="card-row">
-            <div>
-              <label class="pay-label" for="cardExpInput">EXPIRY</label>
-              <input type="text" id="cardExpInput" class="pay-input" placeholder="12/28" maxlength="5" />
-            </div>
-            <div>
-              <label class="pay-label" for="cardCvvInput">CVV</label>
-              <input type="password" id="cardCvvInput" class="pay-input" placeholder="•••" maxlength="4" />
-            </div>
-          </div>
-        </div>
-
-        <button type="submit" class="btn-pay-submit" id="paySubmitBtn">
-          Pay ₹199 Securely
-        </button>
-        <div class="pay-status" id="payStatus" hidden></div>
-      </form>
-    </div>
-  </div>
-
-  <script src="/static/app.js?v=10"></script>
+  <script src="/static/app.js?v=11"></script>
 </body>
 </html>

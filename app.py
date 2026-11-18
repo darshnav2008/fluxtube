@@ -503,22 +503,5 @@ def download_file(job_id):
     return send_file(filepath, as_attachment=True, download_name=filename)
 
 
-@app.route("/api/checkout", methods=["POST"])
-def create_checkout():
-    data = request.get_json(silent=True) or {}
-    plan = (data.get("plan") or "pro_monthly").strip()
-    method = (data.get("method") or "upi").strip()
-    amount = 199 if plan == "pro_monthly" else 99
-    txn_id = f"FLX-{uuid.uuid4().hex[:8].upper()}"
-    return jsonify({
-        "status": "paid",
-        "transaction_id": txn_id,
-        "plan": plan,
-        "method": method,
-        "amount_inr": amount,
-        "message": "Payment verified. FLUXTUBE Pro unlocked!",
-    })
-
-
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5050, debug=False, threaded=True)
