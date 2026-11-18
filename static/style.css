@@ -1565,6 +1565,219 @@ body.workspace-open .sparkle-accent {
   font-size: 0.72rem;
 }
 
+/* AI Podcast Clipper Controls & 9:16 Reels Gallery */
+.ai-status-pill {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.ai-status-pill.ai-on {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+  color: var(--accent-soft);
+}
+
+.ai-controls-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+
+.control-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-label {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pill-opt {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+
+.pill-opt:hover {
+  border-color: var(--accent-border);
+  color: var(--text);
+}
+
+.pill-opt.active {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #0b080c;
+}
+
+.btn-generate-full {
+  width: 100%;
+  justify-content: center;
+  padding: 13px 20px;
+  font-size: 0.95rem;
+}
+
+.clips-empty-state {
+  text-align: center;
+  padding: 46px 20px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.empty-reel-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 50px;
+  height: 76px;
+  border-radius: 12px;
+  border: 1.5px solid var(--accent-border);
+  background: var(--accent-dim);
+  color: var(--accent-soft);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.clips-empty-state h4 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  margin-bottom: 6px;
+}
+
+.clips-empty-state p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  max-width: 320px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+.clips-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+  gap: 14px;
+}
+
+.reel-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.2s, transform 0.18s;
+}
+
+.reel-card:hover {
+  border-color: var(--accent-border);
+  transform: translateY(-2px);
+}
+
+.reel-video-wrap {
+  position: relative;
+  aspect-ratio: 9 / 16;
+  background: #050407;
+}
+
+.reel-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.reel-score-pill {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #0b080c;
+}
+
+.reel-time-pill {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(9, 8, 11, 0.85);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+}
+
+.reel-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reel-title {
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.reel-meta {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--text-muted);
+}
+
+.btn-reel-dl {
+  display: block;
+  text-align: center;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #0b080c;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 6px 18px var(--accent-glow);
+}
+
 @media (max-width: 900px) {
   .topbar-inner {
     grid-template-columns: auto auto;

@@ -1,8 +1,9 @@
 FROM python:3.11-slim
 
-# Install system ffmpeg for fast video clipping, conversion & compression
+# Install system ffmpeg + DejaVu fonts for crisp burned-in captions on Linux
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core fontconfig && \
+    fc-cache -f && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
