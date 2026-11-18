@@ -242,7 +242,7 @@ async function inspectUrl(url) {
     });
     const data = await res.json();
     if (!res.ok) {
-      showError(data.error || "Failed to fetch this YouTube link.");
+      showError(data.error || "Failed to fetch this video link.");
       return;
     }
 

@@ -64,10 +64,10 @@ def detect_platform(url: str) -> str:
         return "Instagram"
     if "tiktok.com" in u:
         return "TikTok"
-    if "twitter.com" in u or "x.com" in u:
-        return "X / Twitter"
-    if is_youtube_url(u):
-        return "YouTube"
+    if "reddit.com" in u or "redd.it" in u:
+        return "Reddit"
+    if "facebook.com" in u or "fb.watch" in u or "fb.com" in u:
+        return "Facebook"
     return "Video Link"
 
 
@@ -334,35 +334,21 @@ def get_info():
     data = request.get_json(silent=True) or {}
     url = (data.get("url") or "").strip()
     if not url:
-        return jsonify({"error": "Please paste a valid YouTube, Instagram, TikTok, or X link."}), 400
+        return jsonify({"error": "Please paste a valid Instagram, TikTok, Reddit, or Facebook link."}), 400
+    if is_youtube_url(url):
+        return jsonify({"error": "YouTube is not supported. Please paste an Instagram, TikTok, Reddit, or Facebook video link."}), 400
 
-    strategies = YT_CLIENT_STRATEGIES if is_youtube_url(url) else [None]
-    info = None
-    last_err = None
-    winning_clients = None
-
-    for clients in strategies:
-        ydl_opts = build_base_ydl_opts(clients)
-        ydl_opts["skip_download"] = True
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                extracted = ydl.extract_info(url, download=False)
-            if extracted:
-                info = extracted
-                winning_clients = clients
-                break
-        except Exception as exc:
-            last_err = str(exc)
-            continue
+    ydl_opts = build_base_ydl_opts(None)
+    ydl_opts["skip_download"] = True
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except Exception as exc:
+        return jsonify({"error": f"Could not fetch video info: {str(exc)}"}), 400
 
     if not info:
-        msg = last_err or "Could not fetch video metadata."
-        if "confirm you" in msg.lower() and "bot" in msg.lower():
-            msg = (
-                "YouTube temporarily blocked this cloud server's IP across all clients. "
-                "Try again in a moment, or test with an Instagram / TikTok / X link."
-            )
-        return jsonify({"error": msg}), 400
+        return jsonify({"error": "Could not fetch video metadata."}), 404
+    winning_clients = None
 
     webpage_url = info.get("webpage_url") or url
     CLIENT_CACHE[webpage_url] = winning_clients
