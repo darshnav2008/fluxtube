@@ -99,6 +99,46 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun openUrl(url: String) {
+            try {
+                val intent = android.content.Intent(
+                    android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse(url)
+                )
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+            } catch (_: Exception) {
+            }
+        }
+
+        @JavascriptInterface
+        fun listDownloads(): String {
+            val arr = JSONArray()
+            try {
+                val dlRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val outDir = File(dlRoot, "FLUXTUBE")
+                if (outDir.exists()) {
+                    outDir.listFiles()
+                        ?.filter { it.isFile }
+                        ?.sortedByDescending { it.lastModified() }
+                        ?.take(30)
+                        ?.forEach { f ->
+                            val mb = f.length() / (1024.0 * 1024.0)
+                            val sizeLabel = if (mb >= 1.0) String.format("%.1f MB", mb)
+                            else String.format("%d KB", (f.length() / 1024).coerceAtLeast(1))
+                            arr.put(JSONObject().apply {
+                                put("name", f.name)
+                                put("size", sizeLabel)
+                                put("ext", f.extension.uppercase())
+                            })
+                        }
+                }
+            } catch (_: Exception) {
+            }
+            return arr.toString()
+        }
+
+        @JavascriptInterface
         fun updateEngine() {
             scope.launch(Dispatchers.IO) {
                 callJs("window.onEngineStatus(false, 'Updating yt-dlp...')")

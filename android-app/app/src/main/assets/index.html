@@ -6,151 +6,367 @@
   <title>Fluxtube</title>
   <style>
     :root {
-      --bg: #09080b;
-      --surface: rgba(20, 18, 25, 0.9);
-      --text: #f7f6f9;
-      --muted: #938e9c;
-      --accent: #ff3e6c;
-      --accent-soft: #ff7096;
-      --accent-grad: linear-gradient(135deg, #ff7b9c 0%, #ff3d6e 55%, #e62256 100%);
-      --accent-dim: rgba(255, 62, 108, 0.14);
-      --accent-border: rgba(255, 62, 108, 0.36);
-      --border: rgba(255, 255, 255, 0.1);
+      --bg: #08070a;
+      --card: rgba(22, 18, 25, 0.86);
+      --card-solid: #151118;
+      --text: #f7f5f9;
+      --muted: #9a93a3;
+      --accent: #ff3b6b;
+      --accent-soft: #ff6e93;
+      --accent-grad: linear-gradient(135deg, #ff7a9c 0%, #ff3b6b 55%, #e31e54 100%);
+      --accent-dim: rgba(255, 59, 107, 0.14);
+      --accent-border: rgba(255, 59, 107, 0.36);
+      --border: rgba(255, 255, 255, 0.09);
+      --border-strong: rgba(255, 255, 255, 0.16);
     }
     [hidden] { display: none !important; }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body {
+    html, body {
       min-height: 100vh;
-      background:
-        radial-gradient(360px circle at 95% 8%, rgba(255, 38, 92, 0.32), transparent 62%),
-        radial-gradient(340px circle at 5% 94%, rgba(225, 24, 78, 0.28), transparent 60%),
-        #09080b;
+      background-color: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 16px 16px 40px;
+      overflow-x: hidden;
+      overscroll-behavior-y: none;
     }
+
+    /* Atmospheric Crimson Glow & Mountain Silhouette Backdrop */
+    .bg-scene {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(360px circle at 92% 14%, rgba(255, 42, 95, 0.34), transparent 64%),
+        radial-gradient(280px circle at 20% 34%, rgba(210, 28, 76, 0.28), transparent 60%),
+        radial-gradient(380px circle at 85% 96%, rgba(225, 24, 78, 0.30), transparent 60%),
+        #08070a;
+    }
+    .bg-scene svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .app-shell {
+      position: relative;
+      z-index: 2;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 14px 16px 104px;
+    }
+
+    /* Top Bar */
     .topbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
     }
     .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
       font-weight: 800;
-      letter-spacing: 0.2em;
-      font-size: 1rem;
+      font-size: 1.15rem;
+      letter-spacing: 0.04em;
     }
+    .brand-play {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+    }
+    .brand-flux { color: #ffffff; }
+    .brand-tube { color: var(--accent); }
+
     .btn-engine {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid var(--border);
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(28, 22, 30, 0.85);
+      border: 1px solid var(--border-strong);
       color: var(--text);
       border-radius: 999px;
-      padding: 6px 12px;
-      font-size: 0.72rem;
+      padding: 7px 14px;
+      font-size: 0.76rem;
       font-weight: 600;
+      backdrop-filter: blur(12px);
     }
-    .hero { text-align: center; margin-bottom: 22px; }
-    .hero h1 {
-      font-size: 2rem;
+    .engine-dot {
+      position: absolute;
+      top: 1px;
+      right: 3px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+    .engine-dot.ready { background: #34d399; box-shadow: 0 0 8px #34d399; }
+
+    /* Hero Section */
+    .hero-block {
+      position: relative;
+      padding: 6px 2px 26px;
+    }
+    .hero-watermark {
+      position: absolute;
+      right: -4px;
+      top: -6px;
+      width: 145px;
+      height: 145px;
+      opacity: 0.42;
+      pointer-events: none;
+    }
+    .hero-title {
+      position: relative;
+      font-size: 2.05rem;
+      font-weight: 800;
       line-height: 1.08;
       letter-spacing: -0.03em;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
-    .hero h1 span {
+    .hero-title .italic-accent {
       font-style: italic;
-      background: linear-gradient(90deg, #ff7096, #ff3667);
+      background: linear-gradient(90deg, #ff6c92 0%, #ff2e63 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-    .subline {
-      font-size: 0.68rem;
-      letter-spacing: 0.2em;
-      color: var(--muted);
-      margin-bottom: 18px;
-    }
-    .engine-pill {
+    .hero-cursor {
       display: inline-block;
-      font-size: 0.7rem;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: var(--accent-dim);
-      border: 1px solid var(--accent-border);
-      color: var(--accent-soft);
+      width: 3px;
+      height: 1.65rem;
+      background: var(--accent-soft);
+      border-radius: 3px;
+      vertical-align: -3px;
+      margin-left: 4px;
+    }
+    .hero-sub {
+      position: relative;
+      font-size: 0.82rem;
+      color: #cfc8d6;
+      letter-spacing: 0.04em;
+    }
+
+    /* Glassmorphic URL Card */
+    .url-card {
+      background: rgba(24, 18, 26, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      border-radius: 22px;
+      padding: 13px;
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.58);
+      backdrop-filter: blur(16px);
       margin-bottom: 14px;
     }
-    .url-box {
+    .input-row {
       display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding: 14px;
-      border-radius: 20px;
-      background: var(--surface);
+      align-items: center;
+      gap: 9px;
+      background: rgba(10, 8, 13, 0.72);
       border: 1px solid var(--border);
-      margin-bottom: 16px;
+      border-radius: 14px;
+      padding: 10px 12px;
+      margin-bottom: 11px;
     }
+    .input-row:focus-within { border-color: var(--accent-border); }
     .url-input {
-      width: 100%;
-      background: rgba(9, 8, 11, 0.85);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px 14px;
-      color: var(--text);
-      font-size: 0.92rem;
+      flex: 1;
+      min-width: 0;
+      background: transparent;
+      border: none;
       outline: none;
+      color: var(--text);
+      font-size: 0.88rem;
     }
-    .url-input:focus { border-color: var(--accent); }
-    .url-actions { display: flex; gap: 8px; }
-    .btn-ghost {
-      flex: 0 0 auto;
-      background: rgba(255, 255, 255, 0.07);
+    .url-input::placeholder { color: #7e7688; }
+    .btn-clear-input {
+      background: none;
+      border: none;
+      color: #8f889a;
+      font-size: 1rem;
+      padding: 2px 4px;
+    }
+    .url-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-paste {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      background: rgba(255, 255, 255, 0.08);
       border: 1px solid var(--border);
       color: var(--text);
       border-radius: 999px;
-      padding: 11px 16px;
-      font-weight: 600;
-      font-size: 0.85rem;
+      padding: 12px 18px;
+      font-size: 0.88rem;
+      font-weight: 700;
     }
-    .btn-primary {
+    .btn-fetch {
       flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       background: var(--accent-grad);
       color: #0b080c;
       border: none;
       border-radius: 999px;
-      padding: 12px 18px;
+      padding: 12px 20px;
+      font-size: 0.94rem;
       font-weight: 800;
-      font-size: 0.92rem;
+      box-shadow: 0 8px 24px rgba(255, 59, 107, 0.4);
     }
-    .btn-primary:disabled { opacity: 0.6; }
-    .chips {
-      display: flex;
-      flex-wrap: wrap;
+    .btn-fetch:disabled { opacity: 0.65; }
+
+    /* Platform Pills Row */
+    .platform-pills {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 7px;
+      margin-bottom: 16px;
+    }
+    .p-pill {
+      display: inline-flex;
+      align-items: center;
       justify-content: center;
-      gap: 8px;
-      margin-bottom: 18px;
-    }
-    .chip {
-      padding: 6px 12px;
+      gap: 5px;
+      padding: 8px 6px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.04);
+      background: rgba(22, 18, 25, 0.84);
       border: 1px solid var(--border);
-      font-size: 0.76rem;
-      color: #d6d2de;
+      color: #e6e1ec;
+      font-size: 0.72rem;
+      font-weight: 600;
     }
-    .error-banner {
-      padding: 10px 14px;
+    .p-pill svg { flex-shrink: 0; }
+
+    /* 2x2 Feature Bento Grid */
+    .bento-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 11px;
+      margin-bottom: 20px;
+    }
+    .bento-card {
+      position: relative;
+      overflow: hidden;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 14px;
+      min-height: 102px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .bento-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .bento-icon { color: var(--accent); display: grid; place-items: center; }
+    .bento-badge {
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #cfc8d8;
+    }
+    .bento-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .bento-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .bento-wm {
+      position: absolute;
+      right: 8px;
+      bottom: 6px;
+      opacity: 0.09;
+      pointer-events: none;
+    }
+
+    /* Quick Access Section */
+    .quick-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .quick-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.96rem;
+      font-weight: 700;
+    }
+    .quick-link {
+      background: none;
+      border: none;
+      color: var(--accent-soft);
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .quick-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+    }
+    .quick-tile {
+      aspect-ratio: 1 / 1;
+      border-radius: 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      color: var(--text);
+    }
+    .quick-tile:active { transform: scale(0.95); border-color: var(--accent-border); }
+
+    /* Error & Status Banners */
+    .status-toast {
+      margin-bottom: 12px;
+      padding: 9px 13px;
       border-radius: 12px;
-      background: rgba(255, 46, 99, 0.16);
+      background: var(--accent-dim);
       border: 1px solid var(--accent-border);
-      color: #ff9cb5;
-      font-size: 0.82rem;
-      margin-bottom: 14px;
+      color: #ffb2c6;
+      font-size: 0.78rem;
     }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
+
+    /* Download Workspace */
+    .ws-card {
+      background: var(--card);
+      border: 1px solid var(--border-strong);
       border-radius: 20px;
       padding: 14px;
       margin-bottom: 14px;
+    }
+    .ws-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .btn-back {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
     }
     .thumb-wrap {
       position: relative;
@@ -158,152 +374,437 @@
       overflow: hidden;
       aspect-ratio: 16 / 9;
       background: #0d0b10;
-      margin-bottom: 12px;
+      margin-bottom: 11px;
     }
     .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .pill-dur {
       position: absolute; bottom: 8px; left: 8px;
-      background: rgba(9, 8, 11, 0.88);
-      padding: 3px 8px; border-radius: 8px; font-size: 0.74rem; font-weight: 700;
+      background: rgba(8, 7, 10, 0.88);
+      padding: 3px 8px; border-radius: 8px; font-size: 0.72rem; font-weight: 700;
     }
     .pill-plat {
       position: absolute; top: 8px; right: 8px;
       background: var(--accent-grad); color: #0b080c;
       padding: 3px 9px; border-radius: 999px; font-size: 0.68rem; font-weight: 800;
     }
-    .v-title { font-size: 1rem; font-weight: 700; line-height: 1.35; margin-bottom: 12px; }
+    .v-title { font-size: 0.96rem; font-weight: 700; line-height: 1.35; margin-bottom: 12px; }
+
     .trim-box {
-      padding: 12px;
+      padding: 11px;
       border-radius: 14px;
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid var(--border);
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
     .trim-top {
       display: flex; justify-content: space-between; align-items: center;
-      font-size: 0.8rem; font-weight: 700; margin-bottom: 10px;
+      font-size: 0.78rem; font-weight: 700; margin-bottom: 8px;
     }
     .trim-badge {
-      font-size: 0.68rem; padding: 3px 8px; border-radius: 999px;
+      font-size: 0.66rem; padding: 3px 8px; border-radius: 999px;
       background: var(--accent-dim); color: var(--accent-soft);
     }
     .time-row {
       display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 8px; align-items: end;
     }
-    .time-field label { display: block; font-size: 0.62rem; color: var(--muted); margin-bottom: 4px; }
+    .time-field label { display: block; font-size: 0.6rem; color: var(--muted); margin-bottom: 3px; }
     .time-field input {
       width: 100%; background: #09080b; border: 1px solid var(--border);
       border-radius: 9px; padding: 8px; color: var(--text); text-align: center;
-      font-family: monospace; font-size: 0.86rem; font-weight: 700;
+      font-family: monospace; font-size: 0.84rem; font-weight: 700;
     }
     .btn-reset {
       background: rgba(255, 255, 255, 0.07); border: 1px solid var(--border);
-      color: var(--text); border-radius: 9px; padding: 9px 10px; font-size: 0.74rem;
+      color: var(--text); border-radius: 9px; padding: 9px 10px; font-size: 0.72rem;
     }
     .q-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 14px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 13px;
     }
     .q-card {
-      text-align: left; padding: 12px; border-radius: 14px;
+      text-align: left; padding: 11px; border-radius: 14px;
       background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border);
       color: var(--text);
     }
     .q-card.selected {
       background: var(--accent-grad); color: #0b080c; border-color: transparent;
     }
-    .q-top { display: flex; justify-content: space-between; font-size: 0.65rem; font-weight: 700; margin-bottom: 4px; }
-    .q-res { font-size: 1.1rem; font-weight: 800; }
-    .q-sub { font-size: 0.72rem; opacity: 0.82; }
+    .q-top { display: flex; justify-content: space-between; font-size: 0.64rem; font-weight: 700; margin-bottom: 3px; }
+    .q-res { font-size: 1.05rem; font-weight: 800; }
+    .q-sub { font-size: 0.7rem; opacity: 0.82; }
+
     .progress-box {
-      margin-top: 12px; padding: 12px; border-radius: 14px;
+      margin-top: 12px; padding: 11px; border-radius: 14px;
       background: var(--accent-dim); border: 1px solid var(--accent-border);
     }
-    .progress-top { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 8px; }
+    .progress-top { display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 7px; }
     .track { height: 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
     .fill { height: 100%; background: var(--accent-grad); width: 0%; transition: width 0.2s; }
+
+    /* Downloads & Settings Views */
+    .section-heading {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 14px;
+    }
+    .dl-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 14px;
+      border-radius: 15px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      margin-bottom: 9px;
+    }
+    .dl-name {
+      font-size: 0.84rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 240px;
+    }
+    .dl-meta { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+    .dl-ext {
+      font-size: 0.66rem;
+      font-weight: 800;
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: var(--accent-dim);
+      color: var(--accent-soft);
+    }
+    .setting-card {
+      padding: 15px;
+      border-radius: 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      margin-bottom: 11px;
+    }
+    .setting-label { font-size: 0.74rem; color: var(--muted); margin-bottom: 6px; }
+    .setting-val { font-size: 0.92rem; font-weight: 700; }
+
+    /* Floating Bottom Navigation Bar */
+    .bottom-nav {
+      position: fixed;
+      left: 14px;
+      right: 14px;
+      bottom: 14px;
+      max-width: 452px;
+      margin: 0 auto;
+      z-index: 50;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      background: rgba(16, 13, 20, 0.94);
+      border: 1px solid var(--border-strong);
+      border-radius: 26px;
+      padding: 9px 8px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(18px);
+    }
+    .nav-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 4px 0;
+    }
+    .nav-btn.active { color: var(--accent); }
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">Fluxtube</div>
-    <button class="btn-engine" id="updateBtn" type="button">Update Engine</button>
-  </header>
-
-  <section class="hero" id="heroTop">
-    <div class="engine-pill" id="engineStatus">Starting engine...</div>
-    <h1>Download <span>video</span><br />locally</h1>
-    <div class="subline">PASTE • CLIP • SAVE TO GALLERY</div>
-  </section>
-
-  <div class="url-box">
-    <input id="urlInput" class="url-input" type="url" placeholder="Paste YouTube, Instagram, TikTok or Facebook link..." />
-    <div class="url-actions">
-      <button id="pasteBtn" class="btn-ghost" type="button">Paste</button>
-      <button id="fetchBtn" class="btn-primary" type="button">Fetch →</button>
-    </div>
+  <div class="bg-scene" aria-hidden="true">
+    <svg viewBox="0 0 430 932" preserveAspectRatio="none">
+      <defs>
+        <radialGradient id="moonGlow" cx="22%" cy="30%" r="16%">
+          <stop offset="0%" stop-color="#ff5e88" stop-opacity="0.55" />
+          <stop offset="55%" stop-color="#a8143d" stop-opacity="0.22" />
+          <stop offset="100%" stop-color="#08070a" stop-opacity="0" />
+        </radialGradient>
+        <linearGradient id="hillGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#2a0a16" stop-opacity="0.85" />
+          <stop offset="100%" stop-color="#08070a" stop-opacity="0.98" />
+        </linearGradient>
+      </defs>
+      <circle cx="96" cy="278" r="64" fill="url(#moonGlow)" />
+      <path d="M0,315 Q95,275 185,328 T430,295 L430,450 L0,450 Z" fill="url(#hillGrad)" />
+      <path d="M0,880 Q150,830 290,875 T430,840 L430,932 L0,932 Z" fill="#2e0716" opacity="0.55" />
+    </svg>
   </div>
 
-  <div class="chips" id="chipsRow">
-    <span class="chip">YouTube</span>
-    <span class="chip">Instagram</span>
-    <span class="chip">TikTok</span>
-    <span class="chip">Facebook</span>
+  <div class="app-shell">
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-play">
+          <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+            <defs>
+              <linearGradient id="playG" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#ff7a9c" />
+                <stop offset="100%" stop-color="#e31e54" />
+              </linearGradient>
+            </defs>
+            <path d="M6 4.5C6 3.1 7.6 2.3 8.8 3.1L23.5 12.6C24.6 13.3 24.6 14.9 23.5 15.6L8.8 25.1C7.6 25.9 6 25.1 6 23.7V4.5Z" fill="url(#playG)" />
+          </svg>
+        </span>
+        <span><span class="brand-flux">Flux</span><span class="brand-tube">tube</span></span>
+      </div>
+
+      <button class="btn-engine" id="updateBtn" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+          <polyline points="21 3 21 9 15 9" />
+        </svg>
+        <span>Update Engine</span>
+        <span class="engine-dot" id="engineDot"></span>
+      </button>
+    </header>
+
+    <div id="statusToast" class="status-toast" hidden></div>
+
+    <!-- HOME TAB -->
+    <main id="tabHome">
+      <section class="hero-block" id="heroBlock">
+        <svg class="hero-watermark" viewBox="0 0 150 150" fill="none">
+          <path d="M75 28V90M75 90L50 65M75 90L100 65" stroke="#ff3b6b" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+          <ellipse cx="75" cy="96" rx="56" ry="20" transform="rotate(-14 75 96)" stroke="#ff5e88" stroke-width="2.2" />
+          <path d="M132 16L135 25L144 28L135 31L132 40L129 31L120 28L129 25L132 16Z" fill="#ff5e88" />
+        </svg>
+        <h1 class="hero-title">
+          Download <span class="italic-accent">video</span><br />locally<span class="hero-cursor"></span>
+        </h1>
+        <div class="hero-sub">Paste • Clip • Save to Gallery</div>
+      </section>
+
+      <!-- URL Input Card -->
+      <div class="url-card">
+        <div class="input-row">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#b6aec2" stroke-width="2">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+          </svg>
+          <input id="urlInput" class="url-input" type="url" placeholder="Paste YouTube, Instagram, TikTok or Facebook link..." />
+          <button id="clearInputBtn" class="btn-clear-input" type="button" aria-label="Clear">✕</button>
+        </div>
+        <div class="url-actions">
+          <button id="pasteBtn" class="btn-paste" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+            <span>Paste</span>
+          </button>
+          <button id="fetchBtn" class="btn-fetch" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+              <path d="M12 3v12" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="5" y1="20" x2="19" y2="20" />
+            </svg>
+            <span id="fetchBtnText">Fetch →</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Landing Widgets (Hidden when workspace opens) -->
+      <div id="landingWidgets">
+        <div class="platform-pills">
+          <button class="p-pill" type="button" data-open="https://m.youtube.com">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="#FF0000"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>
+            <span>YouTube</span>
+          </button>
+          <button class="p-pill" type="button" data-open="https://www.instagram.com">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E1306C" stroke-width="2.2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#E1306C" stroke="none"/></svg>
+            <span>Instagram</span>
+          </button>
+          <button class="p-pill" type="button" data-open="https://www.tiktok.com">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="#25F4EE"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z"/></svg>
+            <span>TikTok</span>
+          </button>
+          <button class="p-pill" type="button" data-open="https://m.facebook.com">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            <span>Facebook</span>
+          </button>
+        </div>
+
+        <div class="bento-grid">
+          <div class="bento-card">
+            <div class="bento-top">
+              <span class="bento-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+            </div>
+            <div>
+              <div class="bento-title">Fast &amp; Reliable</div>
+              <div class="bento-sub">Get videos instantly</div>
+            </div>
+          </div>
+
+          <div class="bento-card">
+            <div class="bento-top">
+              <span class="bento-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><line x1="5" y1="20" x2="19" y2="20"/></svg></span>
+              <span class="bento-badge">4K</span>
+            </div>
+            <div>
+              <div class="bento-title">High Quality</div>
+              <div class="bento-sub">Up to 4K Support</div>
+            </div>
+          </div>
+
+          <div class="bento-card">
+            <div class="bento-top">
+              <span class="bento-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm-1.06 13.54L7.4 12l1.41-1.41 2.12 2.12 4.24-4.24 1.41 1.41-5.64 5.66z"/></svg></span>
+            </div>
+            <div>
+              <div class="bento-title">100% Local</div>
+              <div class="bento-sub">No uploads, no tracking</div>
+            </div>
+          </div>
+
+          <div class="bento-card">
+            <div class="bento-top">
+              <span class="bento-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg></span>
+            </div>
+            <div>
+              <div class="bento-title">Multi-Platform</div>
+              <div class="bento-sub">From all major sites</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="quick-header">
+          <div class="quick-title">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="9" />
+              <polyline points="12 7 12 12 15 15" />
+            </svg>
+            <span>Quick Access</span>
+          </div>
+          <button class="quick-link" id="seeAllBtn" type="button">See all →</button>
+        </div>
+
+        <div class="quick-row">
+          <button class="quick-tile" type="button" data-open="https://m.youtube.com" aria-label="YouTube">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="#FF0000"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>
+          </button>
+          <button class="quick-tile" type="button" data-open="https://www.instagram.com" aria-label="Instagram">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E1306C" stroke-width="2.1"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.2" fill="#E1306C" stroke="none"/></svg>
+          </button>
+          <button class="quick-tile" type="button" data-open="https://www.tiktok.com" aria-label="TikTok">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="#25F4EE"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z"/></svg>
+          </button>
+          <button class="quick-tile" type="button" data-open="https://m.facebook.com" aria-label="Facebook">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          </button>
+          <button class="quick-tile" id="quickPasteTile" type="button" aria-label="Paste Link">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Download Workspace -->
+      <section id="workspace" hidden>
+        <div class="ws-card">
+          <div class="ws-head">
+            <button id="backHomeBtn" class="btn-back" type="button">← Back</button>
+            <span class="trim-badge" id="clipBadge">Full Video</span>
+          </div>
+          <div class="thumb-wrap">
+            <img id="vThumb" src="" alt="" />
+            <span class="pill-dur" id="vDur">0:00</span>
+            <span class="pill-plat" id="vPlat">YouTube</span>
+          </div>
+          <div class="v-title" id="vTitle">Video Title</div>
+
+          <div class="trim-box">
+            <div class="trim-top"><span>Clip Time Range</span></div>
+            <div class="time-row">
+              <div class="time-field">
+                <label for="fromInput">FROM</label>
+                <input id="fromInput" type="text" value="0:00" />
+              </div>
+              <div style="padding-bottom:9px;color:#ff7096;">→</div>
+              <div class="time-field">
+                <label for="toInput">TO</label>
+                <input id="toInput" type="text" value="0:00" />
+              </div>
+              <button id="resetTrim" class="btn-reset" type="button">Reset</button>
+            </div>
+          </div>
+
+          <div class="q-grid" id="qGrid"></div>
+
+          <button id="dlBtn" class="btn-fetch" style="width:100%;" type="button">Download to Phone</button>
+
+          <div id="progressBox" class="progress-box" hidden>
+            <div class="progress-top">
+              <span id="pStage">Starting...</span>
+              <span id="pPct">0%</span>
+            </div>
+            <div class="track"><div id="pFill" class="fill"></div></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- DOWNLOADS TAB -->
+    <section id="tabDownloads" hidden>
+      <h2 class="section-heading">Saved Downloads</h2>
+      <div id="downloadsList"></div>
+    </section>
+
+    <!-- SETTINGS TAB -->
+    <section id="tabSettings" hidden>
+      <h2 class="section-heading">Settings</h2>
+      <div class="setting-card">
+        <div class="setting-label">SAVE FOLDER</div>
+        <div class="setting-val">Downloads / FLUXTUBE</div>
+      </div>
+      <div class="setting-card">
+        <div class="setting-label">ENGINE STATUS</div>
+        <div class="setting-val" id="settingsEngineText">Initializing yt-dlp + FFmpeg...</div>
+      </div>
+      <button id="settingsUpdateBtn" class="btn-fetch" style="width:100%;margin-top:6px;" type="button">
+        Update yt-dlp Engine Now
+      </button>
+    </section>
   </div>
 
-  <div id="errorBanner" class="error-banner" hidden></div>
-
-  <section id="workspace" hidden>
-    <div class="card">
-      <div class="thumb-wrap">
-        <img id="vThumb" src="" alt="" />
-        <span class="pill-dur" id="vDur">0:00</span>
-        <span class="pill-plat" id="vPlat">YouTube</span>
-      </div>
-      <div class="v-title" id="vTitle">Video Title</div>
-
-      <div class="trim-box">
-        <div class="trim-top">
-          <span>Clip Time Range</span>
-          <span class="trim-badge" id="clipBadge">Full Video</span>
-        </div>
-        <div class="time-row">
-          <div class="time-field">
-            <label for="fromInput">FROM</label>
-            <input id="fromInput" type="text" value="0:00" />
-          </div>
-          <div style="padding-bottom:9px;color:#ff7096;">→</div>
-          <div class="time-field">
-            <label for="toInput">TO</label>
-            <input id="toInput" type="text" value="0:00" />
-          </div>
-          <button id="resetTrim" class="btn-reset" type="button">Reset</button>
-        </div>
-      </div>
-
-      <div class="q-grid" id="qGrid"></div>
-
-      <button id="dlBtn" class="btn-primary" style="width:100%;" type="button">Download to Phone</button>
-
-      <div id="progressBox" class="progress-box" hidden>
-        <div class="progress-top">
-          <span id="pStage">Starting...</span>
-          <span id="pPct">0%</span>
-        </div>
-        <div class="track"><div id="pFill" class="fill"></div></div>
-      </div>
-    </div>
-  </section>
+  <!-- Floating Bottom Navigation -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="home" type="button">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="nav-btn" data-tab="downloads" type="button">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><line x1="5" y1="20" x2="19" y2="20"/></svg>
+      <span>Downloads</span>
+    </button>
+    <button class="nav-btn" data-tab="settings" type="button">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </button>
+  </nav>
 
   <script>
     const urlInput = document.getElementById("urlInput");
+    const clearInputBtn = document.getElementById("clearInputBtn");
     const pasteBtn = document.getElementById("pasteBtn");
     const fetchBtn = document.getElementById("fetchBtn");
+    const fetchBtnText = document.getElementById("fetchBtnText");
     const updateBtn = document.getElementById("updateBtn");
-    const engineStatus = document.getElementById("engineStatus");
-    const errorBanner = document.getElementById("errorBanner");
+    const settingsUpdateBtn = document.getElementById("settingsUpdateBtn");
+    const engineDot = document.getElementById("engineDot");
+    const statusToast = document.getElementById("statusToast");
+    const settingsEngineText = document.getElementById("settingsEngineText");
+
+    const heroBlock = document.getElementById("heroBlock");
+    const landingWidgets = document.getElementById("landingWidgets");
     const workspace = document.getElementById("workspace");
-    const heroTop = document.getElementById("heroTop");
-    const chipsRow = document.getElementById("chipsRow");
+    const backHomeBtn = document.getElementById("backHomeBtn");
+
     const vThumb = document.getElementById("vThumb");
     const vDur = document.getElementById("vDur");
     const vPlat = document.getElementById("vPlat");
@@ -319,30 +820,97 @@
     const pPct = document.getElementById("pPct");
     const pFill = document.getElementById("pFill");
 
+    const tabHome = document.getElementById("tabHome");
+    const tabDownloads = document.getElementById("tabDownloads");
+    const tabSettings = document.getElementById("tabSettings");
+    const downloadsList = document.getElementById("downloadsList");
+
     let currentVideo = null;
     let selectedQ = "best_1080";
 
-    window.onEngineStatus = (ready, msg) => {
-      engineStatus.textContent = msg;
-    };
-
-    pasteBtn.addEventListener("click", () => {
-      if (window.FluxAndroid) {
-        const txt = window.FluxAndroid.getClipboard();
-        if (txt) urlInput.value = txt.trim();
+    function showToast(msg, autoHide = true) {
+      statusToast.textContent = msg;
+      statusToast.hidden = false;
+      if (autoHide) {
+        clearTimeout(window._toastT);
+        window._toastT = setTimeout(() => { statusToast.hidden = true; }, 4000);
       }
+    }
+
+    function switchTab(name) {
+      tabHome.hidden = name !== "home";
+      tabDownloads.hidden = name !== "downloads";
+      tabSettings.hidden = name !== "settings";
+      document.querySelectorAll(".nav-btn").forEach((b) => {
+        b.classList.toggle("active", b.dataset.tab === name);
+      });
+      if (name === "downloads") loadDownloads();
+    }
+
+    document.querySelectorAll(".nav-btn").forEach((b) => {
+      b.addEventListener("click", () => switchTab(b.dataset.tab));
     });
 
-    updateBtn.addEventListener("click", () => {
-      if (window.FluxAndroid) window.FluxAndroid.updateEngine();
+    document.getElementById("seeAllBtn").addEventListener("click", () => switchTab("downloads"));
+
+    document.querySelectorAll("[data-open]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const target = el.dataset.open;
+        if (window.FluxAndroid && window.FluxAndroid.openUrl) {
+          window.FluxAndroid.openUrl(target);
+        }
+      });
+    });
+
+    function pasteFromPhone() {
+      if (window.FluxAndroid) {
+        const txt = window.FluxAndroid.getClipboard();
+        if (txt) {
+          urlInput.value = txt.trim();
+          showToast("Link pasted — tap Fetch →");
+        } else {
+          urlInput.focus();
+        }
+      }
+    }
+    pasteBtn.addEventListener("click", pasteFromPhone);
+    document.getElementById("quickPasteTile").addEventListener("click", pasteFromPhone);
+
+    clearInputBtn.addEventListener("click", () => {
+      urlInput.value = "";
+      urlInput.focus();
+    });
+
+    function triggerUpdate() {
+      if (window.FluxAndroid) {
+        showToast("Updating yt-dlp engine...", false);
+        window.FluxAndroid.updateEngine();
+      }
+    }
+    updateBtn.addEventListener("click", triggerUpdate);
+    settingsUpdateBtn.addEventListener("click", triggerUpdate);
+
+    window.onEngineStatus = (ready, msg) => {
+      engineDot.classList.toggle("ready", !!ready);
+      settingsEngineText.textContent = msg;
+      if (!ready || msg.startsWith("Updated")) showToast(msg);
+    };
+
+    backHomeBtn.addEventListener("click", () => {
+      workspace.hidden = true;
+      heroBlock.hidden = false;
+      landingWidgets.hidden = false;
     });
 
     fetchBtn.addEventListener("click", () => {
       const u = urlInput.value.trim();
-      if (!u) return;
-      errorBanner.hidden = true;
+      if (!u) {
+        showToast("Please paste a video link first.");
+        return;
+      }
+      statusToast.hidden = true;
       fetchBtn.disabled = true;
-      fetchBtn.textContent = "Loading...";
+      fetchBtnText.textContent = "Fetching...";
       progressBox.hidden = true;
       if (window.FluxAndroid) window.FluxAndroid.fetchInfo(u);
     });
@@ -387,7 +955,7 @@
 
     window.onFetchSuccess = (data) => {
       fetchBtn.disabled = false;
-      fetchBtn.textContent = "Fetch →";
+      fetchBtnText.textContent = "Fetch →";
       currentVideo = data;
       selectedQ = "best_1080";
       vThumb.src = data.thumbnail || "";
@@ -398,16 +966,15 @@
       toInput.value = data.duration_string || "0:00";
       renderQualities(data.qualities || []);
       updateClipLabel();
-      heroTop.hidden = true;
-      chipsRow.hidden = true;
+      heroBlock.hidden = true;
+      landingWidgets.hidden = true;
       workspace.hidden = false;
     };
 
     window.onFetchError = (msg) => {
       fetchBtn.disabled = false;
-      fetchBtn.textContent = "Fetch →";
-      errorBanner.textContent = msg;
-      errorBanner.hidden = false;
+      fetchBtnText.textContent = "Fetch →";
+      showToast(msg, false);
     };
 
     dlBtn.addEventListener("click", () => {
@@ -437,12 +1004,33 @@
       pPct.textContent = "100%";
       pFill.style.width = "100%";
       pStage.textContent = msg;
+      showToast("Saved to Downloads/FLUXTUBE ✓");
     };
 
     window.onDownloadError = (msg) => {
       dlBtn.disabled = false;
       pStage.textContent = "Error: " + msg;
     };
+
+    function loadDownloads() {
+      downloadsList.innerHTML = "";
+      let items = [];
+      try {
+        if (window.FluxAndroid && window.FluxAndroid.listDownloads) {
+          items = JSON.parse(window.FluxAndroid.listDownloads() || "[]");
+        }
+      } catch {}
+      if (!items.length) {
+        downloadsList.innerHTML = `<div class="setting-card"><div class="setting-val">No saved videos yet</div><div class="setting-label" style="margin-top:4px;">Downloaded videos appear here and in Downloads/FLUXTUBE</div></div>`;
+        return;
+      }
+      items.forEach((it) => {
+        const div = document.createElement("div");
+        div.className = "dl-item";
+        div.innerHTML = `<div><div class="dl-name">${it.name}</div><div class="dl-meta">${it.size}</div></div><span class="dl-ext">${it.ext || "MP4"}</span>`;
+        downloadsList.appendChild(div);
+      });
+    }
   </script>
 </body>
 </html>
