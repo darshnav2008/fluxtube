@@ -1,13 +1,16 @@
-const analyzeForm = document.getElementById("analyzeForm");
-const urlInput = document.getElementById("urlInput");
-const pasteBtn = document.getElementById("pasteBtn");
-const analyzeBtn = document.getElementById("analyzeBtn");
+const dropZoneBar = document.getElementById("dropZoneBar");
+const videoFileInput = document.getElementById("videoFileInput");
+const pickFileBtn = document.getElementById("pickFileBtn");
+const dropFileLabel = document.getElementById("dropFileLabel");
 const errorBanner = document.getElementById("errorBanner");
 const studioWorkspace = document.getElementById("studioWorkspace");
 
-const videoThumb = document.getElementById("videoThumb");
+const videoPreview = document.getElementById("videoPreview");
 const videoDuration = document.getElementById("videoDuration");
+const videoResolutionBadge = document.getElementById("videoPlatform");
 const videoTitle = document.getElementById("videoTitle");
+const grabFrameBtn = document.getElementById("grabFrameBtn");
+const frameToast = document.getElementById("frameToast");
 
 // Direct Time Trimmer Elements
 const clipDurationBadge = document.getElementById("clipDurationBadge");
@@ -39,10 +42,70 @@ const clearHistoryBtn = document.getElementById("clearHistoryBtn");
 const historyList = document.getElementById("historyList");
 const historyCount = document.getElementById("historyCount");
 
-let currentVideo = null;
-let selectedQuality = null;
+const MAX_FILE_BYTES = 150 * 1024 * 1024;
+
+const OUTPUT_MODES = [
+  {
+    id: "trim_mp4",
+    type: "video",
+    badge: "LOSSLESS",
+    ext: "MP4",
+    resolution: "Fast Clip",
+    title: "Exact Cut • Original Quality",
+    ratio: 1.0,
+  },
+  {
+    id: "audio_mp3",
+    type: "audio",
+    badge: "320K AUDIO",
+    ext: "MP3",
+    resolution: "Audio MP3",
+    title: "Studio High-Bitrate Sound",
+    ratio: 0.14,
+  },
+  {
+    id: "audio_m4a",
+    type: "audio",
+    badge: "AAC",
+    ext: "M4A",
+    resolution: "Audio M4A",
+    title: "Compact Apple / Web Audio",
+    ratio: 0.09,
+  },
+  {
+    id: "compress_720",
+    type: "video",
+    badge: "SMALLER",
+    ext: "MP4",
+    resolution: "720p HD",
+    title: "Web & WhatsApp Friendly",
+    ratio: 0.45,
+  },
+  {
+    id: "compress_480",
+    type: "video",
+    badge: "TINY",
+    ext: "MP4",
+    resolution: "480p Lite",
+    title: "Ultra-Compact Sharing",
+    ratio: 0.25,
+  },
+  {
+    id: "mute_video",
+    type: "video",
+    badge: "SILENT",
+    ext: "MP4",
+    resolution: "Mute Video",
+    title: "Remove Audio Track Only",
+    ratio: 0.9,
+  },
+];
+
+let currentFile = null;
+let currentObjectUrl = null;
+let currentDuration = 0;
+let selectedMode = OUTPUT_MODES[0];
 let activeFilter = "all";
-let pollTimer = null;
 
 // Mouse-tracking radial spotlight
 document.addEventListener("mousemove", (e) => {
@@ -88,33 +151,6 @@ function formatBytesJS(bytes) {
   return `${val.toFixed(1)} TB`;
 }
 
-pasteBtn.addEventListener("click", async () => {
-  try {
-    const text = await navigator.clipboard.readText();
-    if (text) {
-      urlInput.value = text.trim();
-      urlInput.focus();
-    }
-  } catch {
-    urlInput.focus();
-  }
-});
-
-document.querySelectorAll(".filter-tab").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    activeFilter = btn.dataset.filter;
-    document.querySelectorAll(".filter-tab").forEach((el) => {
-      el.classList.toggle("active", el.dataset.filter === activeFilter);
-    });
-    renderQualities();
-  });
-});
-
-analyzeForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  inspectUrl(urlInput.value.trim());
-});
-
 function showError(msg) {
   errorBanner.textContent = msg;
   errorBanner.hidden = false;
@@ -125,16 +161,126 @@ function clearError() {
   errorBanner.textContent = "";
 }
 
-function setInspectLoading(loading) {
-  analyzeBtn.disabled = loading;
-  analyzeBtn.querySelector(".btn-label").textContent = loading ? "Loading..." : "Fetch";
-  analyzeBtn.querySelector(".btn-spinner").hidden = !loading;
+// File Picker & Drag-and-Drop
+pickFileBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  videoFileInput.click();
+});
+
+dropZoneBar.addEventListener("click", () => {
+  videoFileInput.click();
+});
+
+videoFileInput.addEventListener("change", () => {
+  if (videoFileInput.files && videoFileInput.files[0]) {
+    loadVideoFile(videoFileInput.files[0]);
+  }
+});
+
+["dragenter", "dragover"].forEach((evt) => {
+  dropZoneBar.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropZoneBar.classList.add("drag-over");
+  });
+});
+
+["dragleave", "drop"].forEach((evt) => {
+  dropZoneBar.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropZoneBar.classList.remove("drag-over");
+  });
+});
+
+dropZoneBar.addEventListener("drop", (e) => {
+  const file = e.dataTransfer?.files?.[0];
+  if (file) loadVideoFile(file);
+});
+
+function loadVideoFile(file) {
+  clearError();
+  if (!file.type.startsWith("video/") && !/\.(mp4|mov|webm|mkv|m4v|avi)$/i.test(file.name)) {
+    showError("Please select a valid video file (MP4, MOV, WebM, MKV).");
+    return;
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    showError("File is over 150 MB. Please choose a smaller video.");
+    return;
+  }
+
+  currentFile = file;
+  if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+  currentObjectUrl = URL.createObjectURL(file);
+
+  dropFileLabel.textContent = `${file.name} (${formatBytesJS(file.size)})`;
+  videoTitle.textContent = file.name;
+  progressHud.hidden = true;
+  saveFileBtn.hidden = true;
+  if (frameToast) frameToast.hidden = true;
+
+  videoPreview.src = currentObjectUrl;
+  videoPreview.onloadedmetadata = () => {
+    currentDuration = Math.max(1, Math.floor(videoPreview.duration || 1));
+    videoDuration.textContent = formatSeconds(currentDuration);
+    const w = videoPreview.videoWidth;
+    const h = videoPreview.videoHeight;
+    videoResolutionBadge.textContent =
+      w && h ? `${w}×${h} • ${formatBytesJS(file.size)}` : formatBytesJS(file.size);
+
+    initTrimmer(currentDuration);
+    renderModes();
+    updateSelectedSummary();
+
+    const introBento = document.getElementById("introBento");
+    const heroTop = document.getElementById("heroTop");
+    const heroBottom = document.getElementById("heroBottom");
+    const heroSection = document.getElementById("heroSection");
+    if (introBento) introBento.hidden = true;
+    if (heroTop) heroTop.hidden = true;
+    if (heroBottom) heroBottom.hidden = true;
+    if (heroSection) heroSection.classList.add("compact-mode");
+    document.body.classList.add("workspace-open");
+    studioWorkspace.hidden = false;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 }
 
+// Instant Client-Side Full-Res Frame Grabber (Zero Server Load)
+grabFrameBtn.addEventListener("click", () => {
+  if (!currentFile || !videoPreview.videoWidth) return;
+  const canvas = document.createElement("canvas");
+  canvas.width = videoPreview.videoWidth;
+  canvas.height = videoPreview.videoHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(videoPreview, 0, 0, canvas.width, canvas.height);
+
+  const ts = formatSeconds(videoPreview.currentTime).replace(/:/g, "-");
+  const baseName = currentFile.name.replace(/\.[^/.]+$/, "");
+  const link = document.createElement("a");
+  link.download = `${baseName}_frame_${ts}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+
+  if (frameToast) {
+    frameToast.textContent = `Saved ${canvas.width}×${canvas.height} PNG at ${formatSeconds(videoPreview.currentTime)}`;
+    frameToast.hidden = false;
+  }
+});
+
+// Filter Tabs
+document.querySelectorAll(".filter-tab").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    activeFilter = btn.dataset.filter;
+    document.querySelectorAll(".filter-tab").forEach((el) => {
+      el.classList.toggle("active", el.dataset.filter === activeFilter);
+    });
+    renderModes();
+  });
+});
+
+// Direct Time Trimmer
 function isTrimmed() {
-  if (!currentVideo) return false;
-  const maxDur = Math.max(1, Math.floor(currentVideo.duration || 60));
-  return Number(startSlider.value) > 0 || Number(endSlider.value) < maxDur;
+  if (!currentDuration) return false;
+  return Number(startSlider.value) > 0 || Number(endSlider.value) < currentDuration;
 }
 
 function initTrimmer(duration) {
@@ -149,13 +295,12 @@ function initTrimmer(duration) {
 
   startTimeInput.value = formatSeconds(0);
   endTimeInput.value = formatSeconds(maxDur);
-
-  updateTrimmerUI();
+  updateTrimmerUI(false);
 }
 
-function updateTrimmerUI() {
-  if (!currentVideo) return;
-  const maxDur = Math.max(1, Math.floor(currentVideo.duration || 60));
+function updateTrimmerUI(seekTarget) {
+  if (!currentDuration) return;
+  const maxDur = Math.max(1, Math.floor(currentDuration));
   let s = Number(startSlider.value);
   let e = Number(endSlider.value);
 
@@ -177,7 +322,10 @@ function updateTrimmerUI() {
     ? `${formatSeconds(clipLen)} clip`
     : `Full (${formatSeconds(maxDur)})`;
 
-  renderQualities();
+  if (seekTarget === "start") videoPreview.currentTime = s;
+  if (seekTarget === "end") videoPreview.currentTime = e;
+
+  renderModes();
   updateSelectedSummary();
 }
 
@@ -185,126 +333,67 @@ startSlider.addEventListener("input", () => {
   if (Number(startSlider.value) >= Number(endSlider.value)) {
     startSlider.value = Math.max(0, Number(endSlider.value) - 1);
   }
-  updateTrimmerUI();
+  updateTrimmerUI("start");
 });
 
 endSlider.addEventListener("input", () => {
   if (Number(endSlider.value) <= Number(startSlider.value)) {
     endSlider.value = Math.min(Number(endSlider.max), Number(startSlider.value) + 1);
   }
-  updateTrimmerUI();
+  updateTrimmerUI("end");
 });
 
 startTimeInput.addEventListener("change", () => {
-  if (!currentVideo) return;
   const parsed = parseTimeString(startTimeInput.value);
   if (parsed !== null) {
     startSlider.value = Math.min(Math.max(0, parsed), Number(endSlider.value) - 1);
   }
-  updateTrimmerUI();
+  updateTrimmerUI("start");
 });
 
 endTimeInput.addEventListener("change", () => {
-  if (!currentVideo) return;
-  const maxDur = Math.max(1, Math.floor(currentVideo.duration || 60));
   const parsed = parseTimeString(endTimeInput.value);
   if (parsed !== null) {
-    endSlider.value = Math.max(Number(startSlider.value) + 1, Math.min(maxDur, parsed));
+    endSlider.value = Math.max(Number(startSlider.value) + 1, Math.min(currentDuration, parsed));
   }
-  updateTrimmerUI();
+  updateTrimmerUI("end");
 });
 
 resetTrimBtn.addEventListener("click", () => {
-  if (!currentVideo) return;
-  initTrimmer(currentVideo.duration);
+  if (currentDuration) initTrimmer(currentDuration);
 });
 
-function getEffectiveSizeLabel(q) {
-  if (!currentVideo || !q.size_bytes || !currentVideo.duration) return q.size;
-  if (!isTrimmed()) return q.size;
+function estimateModeSize(mode) {
+  if (!currentFile || !currentDuration) return "Auto";
   const clipLen = Math.max(1, Number(endSlider.value) - Number(startSlider.value));
-  const ratio = Math.min(1, clipLen / currentVideo.duration);
-  return formatBytesJS(q.size_bytes * ratio);
+  const timeRatio = Math.min(1, clipLen / currentDuration);
+  return `~${formatBytesJS(currentFile.size * timeRatio * mode.ratio)}`;
 }
 
-async function inspectUrl(url) {
-  if (!url) return;
-  clearError();
-  setInspectLoading(true);
-  progressHud.hidden = true;
-  saveFileBtn.hidden = true;
-
-  try {
-    const res = await fetch("/api/info", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      showError(data.error || "Failed to fetch this YouTube link.");
-      return;
-    }
-
-    currentVideo = data;
-    videoThumb.src = data.thumbnail || "";
-    videoDuration.textContent = data.duration_string || "0:00";
-    videoTitle.textContent = data.title;
-    const platEl = document.getElementById("videoPlatform");
-    if (platEl) platEl.textContent = data.platform || "Video";
-
-    selectedQuality =
-      data.qualities.find((q) => q.id === "video_1080") || data.qualities[0] || null;
-
-    initTrimmer(data.duration);
-    renderQualities();
-    updateSelectedSummary();
-    const introBento = document.getElementById("introBento");
-    const heroTop = document.getElementById("heroTop");
-    const heroBottom = document.getElementById("heroBottom");
-    const heroSection = document.getElementById("heroSection");
-    if (introBento) introBento.hidden = true;
-    if (heroTop) heroTop.hidden = true;
-    if (heroBottom) heroBottom.hidden = true;
-    if (heroSection) heroSection.classList.add("compact-mode");
-    document.body.classList.add("workspace-open");
-    studioWorkspace.hidden = false;
-    window.scrollTo({ top: 0, behavior: "smooth" });
-
-    saveToHistory(data);
-  } catch {
-    showError("Network error while contacting local server.");
-  } finally {
-    setInspectLoading(false);
-  }
-}
-
-function renderQualities() {
-  if (!currentVideo) return;
-  const list = currentVideo.qualities.filter((q) =>
-    activeFilter === "all" ? true : q.type === activeFilter
+function renderModes() {
+  const list = OUTPUT_MODES.filter((m) =>
+    activeFilter === "all" ? true : m.type === activeFilter
   );
 
   qualityGrid.innerHTML = "";
-  list.forEach((q) => {
+  list.forEach((m) => {
     const card = document.createElement("button");
     card.type = "button";
-    card.className = `quality-card${selectedQuality && selectedQuality.id === q.id ? " selected" : ""}`;
-    const sizeLabel = getEffectiveSizeLabel(q);
+    card.className = `quality-card${selectedMode && selectedMode.id === m.id ? " selected" : ""}`;
     card.innerHTML = `
       <div class="q-top">
-        <span class="q-badge">${q.badge}</span>
-        <span class="q-ext">${q.ext}</span>
+        <span class="q-badge">${m.badge}</span>
+        <span class="q-ext">${m.ext}</span>
       </div>
-      <div class="q-res">${q.resolution}</div>
+      <div class="q-res">${m.resolution}</div>
       <div class="q-bottom">
-        <span>${q.title}</span>
-        <span>${sizeLabel}</span>
+        <span>${m.title}</span>
+        <span>${estimateModeSize(m)}</span>
       </div>
     `;
     card.addEventListener("click", () => {
-      selectedQuality = q;
-      renderQualities();
+      selectedMode = m;
+      renderModes();
       updateSelectedSummary();
     });
     qualityGrid.appendChild(card);
@@ -312,100 +401,92 @@ function renderQualities() {
 }
 
 function updateSelectedSummary() {
-  if (!selectedQuality) return;
-  const sizeLabel = getEffectiveSizeLabel(selectedQuality);
-  selectedSummaryText.textContent = `${selectedQuality.resolution} ${selectedQuality.ext} (${sizeLabel})`;
-  downloadBtnLabel.textContent = isTrimmed() ? "Download Clip" : "Download";
+  if (!selectedMode) return;
+  selectedSummaryText.textContent = `${selectedMode.resolution} ${selectedMode.ext} (${estimateModeSize(selectedMode)})`;
+  downloadBtnLabel.textContent = isTrimmed() ? "Export Clip" : "Export File";
 }
 
-downloadBtn.addEventListener("click", async () => {
-  if (!currentVideo || !selectedQuality) return;
-  if (pollTimer) clearInterval(pollTimer);
+// Process & Download via XHR (real upload progress)
+downloadBtn.addEventListener("click", () => {
+  if (!currentFile || !selectedMode) return;
 
   downloadBtn.disabled = true;
   progressHud.hidden = false;
   saveFileBtn.hidden = true;
-  progressStage.textContent = isTrimmed()
-    ? `Clipping ${startTimeInput.value} → ${endTimeInput.value}...`
-    : "Starting download...";
+  progressStage.textContent = "Uploading video...";
   progressPct.textContent = "0%";
   progressFill.style.width = "0%";
-  progressSpeed.textContent = "Speed: —";
-  progressEta.textContent = "ETA: —";
+  progressSpeed.textContent = `Input: ${formatBytesJS(currentFile.size)}`;
+  progressEta.textContent = selectedMode.ext;
 
-  try {
-    const res = await fetch("/api/download", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url: currentVideo.webpage_url,
-        quality_id: selectedQuality.id,
-        format_id: selectedQuality.format_id || null,
-        audio_id: selectedQuality.audio_id || null,
-        title: currentVideo.title,
-        duration: currentVideo.duration,
-        start_time: startTimeInput.value,
-        end_time: endTimeInput.value,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.job_id) {
-      progressStage.textContent = data.error || "Could not start download.";
-      downloadBtn.disabled = false;
-      return;
+  const formData = new FormData();
+  formData.append("file", currentFile);
+  formData.append("mode", selectedMode.id);
+  formData.append("start_time", startTimeInput.value);
+  formData.append("end_time", endTimeInput.value);
+  formData.append("duration", String(currentDuration));
+
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/process", true);
+
+  xhr.upload.onprogress = (e) => {
+    if (e.lengthComputable) {
+      const pct = Math.min(70, Math.round((e.loaded / e.total) * 70));
+      progressPct.textContent = `${pct}%`;
+      progressFill.style.width = `${pct}%`;
+      if (pct >= 70) {
+        progressStage.textContent = isTrimmed()
+          ? `Clipping ${startTimeInput.value} → ${endTimeInput.value}...`
+          : `Processing ${selectedMode.resolution}...`;
+      }
+    }
+  };
+
+  xhr.onload = () => {
+    downloadBtn.disabled = false;
+    let data = {};
+    try {
+      data = JSON.parse(xhr.responseText || "{}");
+    } catch {
+      data = {};
     }
 
-    const jobId = data.job_id;
-    pollTimer = setInterval(async () => {
-      try {
-        const pRes = await fetch(`/api/progress/${jobId}`);
-        const p = await pRes.json();
+    if (xhr.status >= 200 && xhr.status < 300 && data.download_url) {
+      progressPct.textContent = "100%";
+      progressFill.style.width = "100%";
+      progressStage.textContent = `Done (${data.actual_size || "Ready"})`;
+      progressSpeed.textContent = `Output: ${data.actual_size || "—"}`;
+      progressEta.textContent = "Saved";
 
-        progressPct.textContent = `${Math.round(p.progress || 0)}%`;
-        progressFill.style.width = `${p.progress || 0}%`;
-        progressSpeed.textContent = `Speed: ${p.speed || "—"}`;
-        progressEta.textContent = `ETA: ${p.eta || "—"}`;
+      saveFileBtn.href = data.download_url;
+      saveFileBtn.hidden = false;
 
-        if (p.status === "downloading") {
-          progressStage.textContent = isTrimmed()
-            ? `Trimming ${startTimeInput.value} → ${endTimeInput.value}...`
-            : "Downloading...";
-        } else if (p.status === "processing") {
-          progressStage.textContent = "Finalizing file...";
-        } else if (p.status === "completed") {
-          clearInterval(pollTimer);
-          progressStage.textContent = p.actual_size
-            ? `Done (${p.actual_size})`
-            : "Done — saving file!";
-          downloadBtn.disabled = false;
-          const fileUrl = `/api/file/${jobId}`;
-          saveFileBtn.href = fileUrl;
-          saveFileBtn.hidden = false;
+      const a = document.createElement("a");
+      a.href = data.download_url;
+      a.download = data.filename || "fluxtube_output.mp4";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
 
-          const a = document.createElement("a");
-          a.href = fileUrl;
-          a.download = p.filename || "video.mp4";
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-        } else if (p.status === "error") {
-          clearInterval(pollTimer);
-          progressStage.textContent = `Error: ${p.error || "Download failed"}`;
-          downloadBtn.disabled = false;
-        }
-      } catch {
-        clearInterval(pollTimer);
-        downloadBtn.disabled = false;
-      }
-    }, 700);
-  } catch {
-    progressStage.textContent = "Failed to connect to download server.";
+      saveToHistory({
+        name: data.filename,
+        mode: `${selectedMode.resolution} • ${data.actual_size || ""}`,
+      });
+    } else {
+      progressStage.textContent = `Error: ${data.error || "Processing failed"}`;
+    }
+  };
+
+  xhr.onerror = () => {
     downloadBtn.disabled = false;
-  }
+    progressStage.textContent = "Network error while uploading. Please try again.";
+  };
+
+  xhr.send(formData);
 });
 
 // History Drawer
-const HISTORY_KEY = "fluxtube_history_v1";
+const HISTORY_KEY = "fluxtube_studio_history_v1";
 
 function getHistory() {
   try {
@@ -415,15 +496,12 @@ function getHistory() {
   }
 }
 
-function saveToHistory(video) {
-  const items = getHistory().filter((item) => item.id !== video.id);
+function saveToHistory(entry) {
+  const items = getHistory();
   items.unshift({
-    id: video.id,
-    title: video.title,
-    thumbnail: video.thumbnail,
-    uploader: video.uploader,
-    duration_string: video.duration_string,
-    webpage_url: video.webpage_url,
+    name: entry.name,
+    mode: entry.mode,
+    time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
   });
   localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, 12)));
   renderHistory();
@@ -433,28 +511,21 @@ function renderHistory() {
   const items = getHistory();
   historyCount.textContent = items.length;
   if (!items.length) {
-    historyList.innerHTML = `<p class="drawer-empty">No videos yet.</p>`;
+    historyList.innerHTML = `<p class="drawer-empty">No exports yet.</p>`;
     return;
   }
 
   historyList.innerHTML = "";
   items.forEach((item) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "history-item";
-    btn.innerHTML = `
-      <img src="${item.thumbnail || ""}" alt="" />
+    const row = document.createElement("div");
+    row.className = "history-item";
+    row.innerHTML = `
       <div>
-        <div class="history-item-title">${item.title}</div>
-        <div class="history-item-sub">${item.duration_string}</div>
+        <div class="history-item-title">${item.name}</div>
+        <div class="history-item-sub">${item.mode} • ${item.time}</div>
       </div>
     `;
-    btn.addEventListener("click", () => {
-      toggleDrawer(false);
-      urlInput.value = item.webpage_url;
-      inspectUrl(item.webpage_url);
-    });
-    historyList.appendChild(btn);
+    historyList.appendChild(row);
   });
 }
 
