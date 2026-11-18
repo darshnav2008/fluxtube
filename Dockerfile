@@ -1,9 +1,10 @@
 FROM python:3.11-slim
 
-# Install system ffmpeg for fast video/audio muxing & clipping
+# Install system ffmpeg + Deno JS runtime (required by yt-dlp for YouTube)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ffmpeg && \
     rm -rf /var/lib/apt/lists/*
+COPY --from=denoland/deno:bin /deno /usr/local/bin/deno
 
 WORKDIR /app
 

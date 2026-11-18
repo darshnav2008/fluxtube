@@ -24,8 +24,28 @@ app = Flask(__name__)
 DOWNLOAD_DIR = Path(tempfile.gettempdir()) / "fluxtube_downloads"
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+COOKIE_TMP_PATH = Path(tempfile.gettempdir()) / "fluxtube_cookies.txt"
+
 JOBS = {}
 JOBS_LOCK = threading.Lock()
+
+
+def get_cookiefile_path() -> Optional[str]:
+    """Load YouTube cookies from Render Secret File or YOUTUBE_COOKIES env var into a writable temp file."""
+    secret_file = Path("/etc/secrets/cookies.txt")
+    raw = None
+    if secret_file.is_file():
+        try:
+            raw = secret_file.read_text(encoding="utf-8")
+        except OSError:
+            raw = None
+    if not raw:
+        raw = os.environ.get("YOUTUBE_COOKIES", "").strip()
+    if not raw:
+        return None
+    normalized = raw.replace("\r\n", "\n").replace("\r", "\n")
+    COOKIE_TMP_PATH.write_text(normalized, encoding="utf-8")
+    return str(COOKIE_TMP_PATH)
 
 
 def detect_platform(url: str) -> str:
@@ -273,6 +293,9 @@ def get_info():
         "skip_download": True,
         "noplaylist": True,
     }
+    cookie_file = get_cookiefile_path()
+    if cookie_file:
+        ydl_opts["cookiefile"] = cookie_file
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -348,6 +371,9 @@ def run_download_job(
         "ffmpeg_location": FFMPEG_PATH,
         "progress_hooks": [progress_hook],
     }
+    cookie_file = get_cookiefile_path()
+    if cookie_file:
+        ydl_opts["cookiefile"] = cookie_file
 
     if is_clipped:
         ydl_opts["download_ranges"] = download_range_func(None, [(start_sec, end_sec)])
