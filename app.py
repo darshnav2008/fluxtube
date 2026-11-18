@@ -1,6 +1,7 @@
 import os
 import re
 import shutil
+import sys
 import tempfile
 import threading
 import time
@@ -33,8 +34,13 @@ def resolve_ffmpeg() -> str:
 
 
 FFMPEG_PATH = resolve_ffmpeg()
+BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=str(BASE_DIR / "templates"),
+    static_folder=str(BASE_DIR / "static"),
+)
 
 DOWNLOAD_DIR = Path(tempfile.gettempdir()) / "fluxtube_downloads"
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -60,6 +66,8 @@ def is_youtube_url(url: str) -> bool:
 
 def detect_platform(url: str) -> str:
     u = (url or "").lower()
+    if is_youtube_url(u):
+        return "YouTube"
     if "instagram.com" in u:
         return "Instagram"
     if "tiktok.com" in u:
@@ -332,21 +340,29 @@ def get_info():
     data = request.get_json(silent=True) or {}
     url = (data.get("url") or "").strip()
     if not url:
-        return jsonify({"error": "Please paste a valid Instagram, TikTok, or Facebook link."}), 400
-    if is_youtube_url(url):
-        return jsonify({"error": "YouTube is not supported. Please paste an Instagram, TikTok, or Facebook video link."}), 400
+        return jsonify({"error": "Please paste a valid YouTube, Instagram, TikTok, or Facebook link."}), 400
 
-    ydl_opts = build_base_ydl_opts(None)
-    ydl_opts["skip_download"] = True
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-    except Exception as exc:
-        return jsonify({"error": f"Could not fetch video info: {str(exc)}"}), 400
+    strategies = YT_CLIENT_STRATEGIES if is_youtube_url(url) else [None]
+    info = None
+    last_err = None
+    winning_clients = None
+
+    for clients in strategies:
+        ydl_opts = build_base_ydl_opts(clients)
+        ydl_opts["skip_download"] = True
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                extracted = ydl.extract_info(url, download=False)
+            if extracted:
+                info = extracted
+                winning_clients = clients
+                break
+        except Exception as exc:
+            last_err = str(exc)
+            continue
 
     if not info:
-        return jsonify({"error": "Could not fetch video metadata."}), 404
-    winning_clients = None
+        return jsonify({"error": f"Could not fetch video info: {last_err or 'Unknown error'}"}), 400
 
     webpage_url = info.get("webpage_url") or url
     CLIENT_CACHE[webpage_url] = winning_clients
@@ -588,4 +604,15 @@ def download_file(job_id):
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5050, debug=False, threaded=True)
+    port = int(os.environ.get("PORT", 5050))
+    try:
+        import webview
+        threading.Thread(
+            target=lambda: app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False, threaded=True),
+            daemon=True,
+        ).start()
+        time.sleep(0.8)
+        webview.create_window("FLUXTUBE", f"http://127.0.0.1:{port}", width=1240, height=820, background_color="#09080B")
+        webview.start()
+    except ImportError:
+        app.run(host="127.0.0.1", port=port, debug=False, threaded=True)
