@@ -1,28 +1,35 @@
-const dropZoneBar = document.getElementById("dropZoneBar");
-const videoFileInput = document.getElementById("videoFileInput");
-const pickFileBtn = document.getElementById("pickFileBtn");
-const dropFileLabel = document.getElementById("dropFileLabel");
+const analyzeForm = document.getElementById("analyzeForm");
+const urlInput = document.getElementById("urlInput");
+const pasteBtn = document.getElementById("pasteBtn");
+const analyzeBtn = document.getElementById("analyzeBtn");
 const errorBanner = document.getElementById("errorBanner");
 const studioWorkspace = document.getElementById("studioWorkspace");
 
-const videoPreview = document.getElementById("videoPreview");
+const videoThumb = document.getElementById("videoThumb");
 const videoDuration = document.getElementById("videoDuration");
-const videoResolutionBadge = document.getElementById("videoPlatform");
 const videoTitle = document.getElementById("videoTitle");
-const aiStatusBadge = document.getElementById("aiStatusBadge");
 
-const generateBtn = document.getElementById("generateBtn");
-const generateBtnLabel = document.getElementById("generateBtnLabel");
+// Direct Time Trimmer Elements
+const clipDurationBadge = document.getElementById("clipDurationBadge");
+const startSlider = document.getElementById("startSlider");
+const endSlider = document.getElementById("endSlider");
+const rangeTrackFill = document.getElementById("rangeTrackFill");
+const startTimeInput = document.getElementById("startTimeInput");
+const endTimeInput = document.getElementById("endTimeInput");
+const resetTrimBtn = document.getElementById("resetTrimBtn");
+
+const qualityGrid = document.getElementById("qualityGrid");
+const selectedSummaryText = document.getElementById("selectedSummaryText");
+const downloadBtn = document.getElementById("downloadBtn");
+const downloadBtnLabel = document.getElementById("downloadBtnLabel");
+
 const progressHud = document.getElementById("progressHud");
 const progressStage = document.getElementById("progressStage");
 const progressPct = document.getElementById("progressPct");
 const progressFill = document.getElementById("progressFill");
 const progressSpeed = document.getElementById("progressSpeed");
 const progressEta = document.getElementById("progressEta");
-
-const clipsGallery = document.getElementById("clipsGallery");
-const clipsEmptyState = document.getElementById("clipsEmptyState");
-const clipsCountBadge = document.getElementById("clipsCountBadge");
+const saveFileBtn = document.getElementById("saveFileBtn");
 
 const historyToggle = document.getElementById("historyToggle");
 const historyDrawer = document.getElementById("historyDrawer");
@@ -32,20 +39,10 @@ const clearHistoryBtn = document.getElementById("clearHistoryBtn");
 const historyList = document.getElementById("historyList");
 const historyCount = document.getElementById("historyCount");
 
-const MAX_FILE_BYTES = 250 * 1024 * 1024;
-
-let currentFile = null;
-let currentObjectUrl = null;
-let currentDuration = 60;
+let currentVideo = null;
+let selectedQuality = null;
+let activeFilter = "all";
 let pollTimer = null;
-
-const settings = {
-  clip_len: 30,
-  num_clips: 3,
-  framing: "blur_bg",
-  caption_style: "viral_yellow",
-  effect: "cinematic",
-};
 
 // Mouse-tracking radial spotlight
 document.addEventListener("mousemove", (e) => {
@@ -56,31 +53,30 @@ document.addEventListener("mousemove", (e) => {
   });
 });
 
-// Check whether GROQ_API_KEY is active on server
-fetch("/api/health")
-  .then((r) => r.json())
-  .then((h) => {
-    if (!aiStatusBadge) return;
-    if (h.ai_captions_enabled) {
-      aiStatusBadge.textContent = "AI Whisper Captions: ACTIVE";
-      aiStatusBadge.classList.add("ai-on");
-    } else {
-      aiStatusBadge.textContent = "Smart Auto-Clip Mode (Add GROQ_API_KEY for AI Captions)";
-    }
-  })
-  .catch(() => {});
-
 function formatSeconds(sec) {
   sec = Math.max(0, Math.floor(Number(sec) || 0));
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = sec % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+function parseTimeString(str) {
+  if (!str) return null;
+  const clean = String(str).trim();
+  if (/^\d+(\.\d+)?$/.test(clean)) return Math.max(0, Math.floor(Number(clean)));
+  const parts = clean.split(":").map((p) => Number(p));
+  if (parts.some((n) => Number.isNaN(n) || n < 0)) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
 function formatBytesJS(bytes) {
-  if (!bytes || bytes <= 0) return "0 B";
+  if (!bytes || bytes <= 0) return "Auto";
   const units = ["B", "KB", "MB", "GB"];
   let val = bytes;
   for (const u of units) {
@@ -92,6 +88,33 @@ function formatBytesJS(bytes) {
   return `${val.toFixed(1)} TB`;
 }
 
+pasteBtn.addEventListener("click", async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      urlInput.value = text.trim();
+      urlInput.focus();
+    }
+  } catch {
+    urlInput.focus();
+  }
+});
+
+document.querySelectorAll(".filter-tab").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    activeFilter = btn.dataset.filter;
+    document.querySelectorAll(".filter-tab").forEach((el) => {
+      el.classList.toggle("active", el.dataset.filter === activeFilter);
+    });
+    renderQualities();
+  });
+});
+
+analyzeForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  inspectUrl(urlInput.value.trim());
+});
+
 function showError(msg) {
   errorBanner.textContent = msg;
   errorBanner.hidden = false;
@@ -102,92 +125,140 @@ function clearError() {
   errorBanner.textContent = "";
 }
 
-// Pill Selector Groups
-document.querySelectorAll(".pill-group").forEach((group) => {
-  const key = group.dataset.setting;
-  group.querySelectorAll(".pill-opt").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      group.querySelectorAll(".pill-opt").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      const val = btn.dataset.val;
-      settings[key] = key === "clip_len" || key === "num_clips" ? Number(val) : val;
-      updateGenerateLabel();
-    });
-  });
-});
-
-function updateGenerateLabel() {
-  generateBtnLabel.textContent = `Generate ${settings.num_clips} × ${settings.clip_len}s Clips →`;
+function setInspectLoading(loading) {
+  analyzeBtn.disabled = loading;
+  analyzeBtn.querySelector(".btn-label").textContent = loading ? "Loading..." : "Fetch";
+  analyzeBtn.querySelector(".btn-spinner").hidden = !loading;
 }
-updateGenerateLabel();
 
-// Upload / Drag & Drop
-pickFileBtn.addEventListener("click", (e) => {
-  e.stopPropagation();
-  videoFileInput.click();
-});
+function isTrimmed() {
+  if (!currentVideo) return false;
+  const maxDur = Math.max(1, Math.floor(currentVideo.duration || 60));
+  return Number(startSlider.value) > 0 || Number(endSlider.value) < maxDur;
+}
 
-dropZoneBar.addEventListener("click", () => videoFileInput.click());
+function initTrimmer(duration) {
+  const maxDur = Math.max(1, Math.floor(duration || 60));
+  startSlider.min = 0;
+  startSlider.max = maxDur;
+  startSlider.value = 0;
 
-videoFileInput.addEventListener("change", () => {
-  if (videoFileInput.files && videoFileInput.files[0]) {
-    loadPodcastFile(videoFileInput.files[0]);
+  endSlider.min = 0;
+  endSlider.max = maxDur;
+  endSlider.value = maxDur;
+
+  startTimeInput.value = formatSeconds(0);
+  endTimeInput.value = formatSeconds(maxDur);
+
+  updateTrimmerUI();
+}
+
+function updateTrimmerUI() {
+  if (!currentVideo) return;
+  const maxDur = Math.max(1, Math.floor(currentVideo.duration || 60));
+  let s = Number(startSlider.value);
+  let e = Number(endSlider.value);
+
+  if (s >= e) {
+    s = Math.max(0, e - 1);
+    startSlider.value = s;
   }
+
+  const leftPct = (s / maxDur) * 100;
+  const rightPct = (e / maxDur) * 100;
+  rangeTrackFill.style.left = `${leftPct}%`;
+  rangeTrackFill.style.width = `${Math.max(0, rightPct - leftPct)}%`;
+
+  startTimeInput.value = formatSeconds(s);
+  endTimeInput.value = formatSeconds(e);
+
+  const clipLen = Math.max(1, e - s);
+  clipDurationBadge.textContent = isTrimmed()
+    ? `${formatSeconds(clipLen)} clip`
+    : `Full (${formatSeconds(maxDur)})`;
+
+  renderQualities();
+  updateSelectedSummary();
+}
+
+startSlider.addEventListener("input", () => {
+  if (Number(startSlider.value) >= Number(endSlider.value)) {
+    startSlider.value = Math.max(0, Number(endSlider.value) - 1);
+  }
+  updateTrimmerUI();
 });
 
-["dragenter", "dragover"].forEach((evt) => {
-  dropZoneBar.addEventListener(evt, (e) => {
-    e.preventDefault();
-    dropZoneBar.classList.add("drag-over");
-  });
+endSlider.addEventListener("input", () => {
+  if (Number(endSlider.value) <= Number(startSlider.value)) {
+    endSlider.value = Math.min(Number(endSlider.max), Number(startSlider.value) + 1);
+  }
+  updateTrimmerUI();
 });
 
-["dragleave", "drop"].forEach((evt) => {
-  dropZoneBar.addEventListener(evt, (e) => {
-    e.preventDefault();
-    dropZoneBar.classList.remove("drag-over");
-  });
+startTimeInput.addEventListener("change", () => {
+  if (!currentVideo) return;
+  const parsed = parseTimeString(startTimeInput.value);
+  if (parsed !== null) {
+    startSlider.value = Math.min(Math.max(0, parsed), Number(endSlider.value) - 1);
+  }
+  updateTrimmerUI();
 });
 
-dropZoneBar.addEventListener("drop", (e) => {
-  const file = e.dataTransfer?.files?.[0];
-  if (file) loadPodcastFile(file);
+endTimeInput.addEventListener("change", () => {
+  if (!currentVideo) return;
+  const maxDur = Math.max(1, Math.floor(currentVideo.duration || 60));
+  const parsed = parseTimeString(endTimeInput.value);
+  if (parsed !== null) {
+    endSlider.value = Math.max(Number(startSlider.value) + 1, Math.min(maxDur, parsed));
+  }
+  updateTrimmerUI();
 });
 
-function loadPodcastFile(file) {
+resetTrimBtn.addEventListener("click", () => {
+  if (!currentVideo) return;
+  initTrimmer(currentVideo.duration);
+});
+
+function getEffectiveSizeLabel(q) {
+  if (!currentVideo || !q.size_bytes || !currentVideo.duration) return q.size;
+  if (!isTrimmed()) return q.size;
+  const clipLen = Math.max(1, Number(endSlider.value) - Number(startSlider.value));
+  const ratio = Math.min(1, clipLen / currentVideo.duration);
+  return formatBytesJS(q.size_bytes * ratio);
+}
+
+async function inspectUrl(url) {
+  if (!url) return;
   clearError();
-  if (!file.type.startsWith("video/") && !/\.(mp4|mov|webm|mkv|m4v|avi)$/i.test(file.name)) {
-    showError("Please upload a valid video file (MP4, MOV, WebM, MKV).");
-    return;
-  }
-  if (file.size > MAX_FILE_BYTES) {
-    showError("File is over 250 MB. Please upload a smaller podcast video.");
-    return;
-  }
-
-  currentFile = file;
-  if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
-  currentObjectUrl = URL.createObjectURL(file);
-
-  dropFileLabel.textContent = `${file.name} (${formatBytesJS(file.size)})`;
-  const pickLabel = pickFileBtn.querySelector(".btn-label");
-  if (pickLabel) pickLabel.textContent = "Change Podcast";
-
-  videoTitle.textContent = file.name;
+  setInspectLoading(true);
   progressHud.hidden = true;
-  clipsGallery.innerHTML = "";
-  clipsEmptyState.hidden = false;
-  clipsCountBadge.textContent = "Ready";
+  saveFileBtn.hidden = true;
 
-  videoPreview.src = currentObjectUrl;
-  videoPreview.onloadedmetadata = () => {
-    currentDuration = Math.max(5, Math.floor(videoPreview.duration || 60));
-    videoDuration.textContent = formatSeconds(currentDuration);
-    const w = videoPreview.videoWidth;
-    const h = videoPreview.videoHeight;
-    videoResolutionBadge.textContent =
-      w && h ? `${w}×${h} • ${formatBytesJS(file.size)}` : formatBytesJS(file.size);
+  try {
+    const res = await fetch("/api/info", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showError(data.error || "Failed to fetch this YouTube link.");
+      return;
+    }
 
+    currentVideo = data;
+    videoThumb.src = data.thumbnail || "";
+    videoDuration.textContent = data.duration_string || "0:00";
+    videoTitle.textContent = data.title;
+    const platEl = document.getElementById("videoPlatform");
+    if (platEl) platEl.textContent = data.platform || "Video";
+
+    selectedQuality =
+      data.qualities.find((q) => q.id === "video_1080") || data.qualities[0] || null;
+
+    initTrimmer(data.duration);
+    renderQualities();
+    updateSelectedSummary();
     const introBento = document.getElementById("introBento");
     const heroTop = document.getElementById("heroTop");
     const heroBottom = document.getElementById("heroBottom");
@@ -199,136 +270,142 @@ function loadPodcastFile(file) {
     document.body.classList.add("workspace-open");
     studioWorkspace.hidden = false;
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+
+    saveToHistory(data);
+  } catch {
+    showError("Network error while contacting local server.");
+  } finally {
+    setInspectLoading(false);
+  }
 }
 
-// Generate AI Vertical Clips
-generateBtn.addEventListener("click", () => {
-  if (!currentFile) return;
+function renderQualities() {
+  if (!currentVideo) return;
+  const list = currentVideo.qualities.filter((q) =>
+    activeFilter === "all" ? true : q.type === activeFilter
+  );
+
+  qualityGrid.innerHTML = "";
+  list.forEach((q) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `quality-card${selectedQuality && selectedQuality.id === q.id ? " selected" : ""}`;
+    const sizeLabel = getEffectiveSizeLabel(q);
+    card.innerHTML = `
+      <div class="q-top">
+        <span class="q-badge">${q.badge}</span>
+        <span class="q-ext">${q.ext}</span>
+      </div>
+      <div class="q-res">${q.resolution}</div>
+      <div class="q-bottom">
+        <span>${q.title}</span>
+        <span>${sizeLabel}</span>
+      </div>
+    `;
+    card.addEventListener("click", () => {
+      selectedQuality = q;
+      renderQualities();
+      updateSelectedSummary();
+    });
+    qualityGrid.appendChild(card);
+  });
+}
+
+function updateSelectedSummary() {
+  if (!selectedQuality) return;
+  const sizeLabel = getEffectiveSizeLabel(selectedQuality);
+  selectedSummaryText.textContent = `${selectedQuality.resolution} ${selectedQuality.ext} (${sizeLabel})`;
+  downloadBtnLabel.textContent = isTrimmed() ? "Download Clip" : "Download";
+}
+
+downloadBtn.addEventListener("click", async () => {
+  if (!currentVideo || !selectedQuality) return;
   if (pollTimer) clearInterval(pollTimer);
 
-  generateBtn.disabled = true;
+  downloadBtn.disabled = true;
   progressHud.hidden = false;
-  progressStage.textContent = "Uploading podcast video...";
+  saveFileBtn.hidden = true;
+  progressStage.textContent = isTrimmed()
+    ? `Clipping ${startTimeInput.value} → ${endTimeInput.value}...`
+    : "Starting download...";
   progressPct.textContent = "0%";
   progressFill.style.width = "0%";
-  progressSpeed.textContent = `Input: ${formatBytesJS(currentFile.size)}`;
-  progressEta.textContent = `${settings.num_clips} × ${settings.clip_len}s (9:16)`;
+  progressSpeed.textContent = "Speed: —";
+  progressEta.textContent = "ETA: —";
 
-  const formData = new FormData();
-  formData.append("file", currentFile);
-  formData.append("duration", String(currentDuration));
-  formData.append("num_clips", String(settings.num_clips));
-  formData.append("clip_len", String(settings.clip_len));
-  formData.append("framing", settings.framing);
-  formData.append("caption_style", settings.caption_style);
-  formData.append("effect", settings.effect);
-
-  const xhr = new XMLHttpRequest();
-  xhr.open("POST", "/api/generate-clips", true);
-
-  xhr.upload.onprogress = (e) => {
-    if (e.lengthComputable) {
-      const pct = Math.min(25, Math.round((e.loaded / e.total) * 25));
-      progressPct.textContent = `${pct}%`;
-      progressFill.style.width = `${pct}%`;
-    }
-  };
-
-  xhr.onload = () => {
-    let data = {};
-    try {
-      data = JSON.parse(xhr.responseText || "{}");
-    } catch {
-      data = {};
-    }
-
-    if (xhr.status < 200 || xhr.status >= 300 || !data.job_id) {
-      progressStage.textContent = data.error || "Upload failed. Try again.";
-      generateBtn.disabled = false;
+  try {
+    const res = await fetch("/api/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: currentVideo.webpage_url,
+        quality_id: selectedQuality.id,
+        format_id: selectedQuality.format_id || null,
+        audio_id: selectedQuality.audio_id || null,
+        title: currentVideo.title,
+        duration: currentVideo.duration,
+        start_time: startTimeInput.value,
+        end_time: endTimeInput.value,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.job_id) {
+      progressStage.textContent = data.error || "Could not start download.";
+      downloadBtn.disabled = false;
       return;
     }
 
     const jobId = data.job_id;
     pollTimer = setInterval(async () => {
       try {
-        const res = await fetch(`/api/job/${jobId}`);
-        const job = await res.json();
+        const pRes = await fetch(`/api/progress/${jobId}`);
+        const p = await pRes.json();
 
-        const mappedPct = Math.max(25, Math.round(25 + (job.progress || 0) * 0.75));
-        progressPct.textContent = `${Math.min(100, mappedPct)}%`;
-        progressFill.style.width = `${Math.min(100, mappedPct)}%`;
-        progressStage.textContent = job.stage || "Processing...";
+        progressPct.textContent = `${Math.round(p.progress || 0)}%`;
+        progressFill.style.width = `${p.progress || 0}%`;
+        progressSpeed.textContent = `Speed: ${p.speed || "—"}`;
+        progressEta.textContent = `ETA: ${p.eta || "—"}`;
 
-        if (job.status === "completed") {
+        if (p.status === "downloading") {
+          progressStage.textContent = isTrimmed()
+            ? `Trimming ${startTimeInput.value} → ${endTimeInput.value}...`
+            : "Downloading...";
+        } else if (p.status === "processing") {
+          progressStage.textContent = "Finalizing file...";
+        } else if (p.status === "completed") {
           clearInterval(pollTimer);
-          generateBtn.disabled = false;
-          progressPct.textContent = "100%";
-          progressFill.style.width = "100%";
-          renderClipsGallery(job.clips || [], job.ai_mode);
-          saveToHistory({
-            name: currentFile.name,
-            summary: `${(job.clips || []).length} × ${settings.clip_len}s Vertical Clips`,
-          });
-        } else if (job.status === "error") {
+          progressStage.textContent = p.actual_size
+            ? `Done (${p.actual_size})`
+            : "Done — saving file!";
+          downloadBtn.disabled = false;
+          const fileUrl = `/api/file/${jobId}`;
+          saveFileBtn.href = fileUrl;
+          saveFileBtn.hidden = false;
+
+          const a = document.createElement("a");
+          a.href = fileUrl;
+          a.download = p.filename || "video.mp4";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        } else if (p.status === "error") {
           clearInterval(pollTimer);
-          generateBtn.disabled = false;
-          progressStage.textContent = `Error: ${job.error || "Could not generate clips"}`;
+          progressStage.textContent = `Error: ${p.error || "Download failed"}`;
+          downloadBtn.disabled = false;
         }
       } catch {
         clearInterval(pollTimer);
-        generateBtn.disabled = false;
-        progressStage.textContent = "Lost connection to server.";
+        downloadBtn.disabled = false;
       }
-    }, 1200);
-  };
-
-  xhr.onerror = () => {
-    generateBtn.disabled = false;
-    progressStage.textContent = "Network error during upload.";
-  };
-
-  xhr.send(formData);
+    }, 700);
+  } catch {
+    progressStage.textContent = "Failed to connect to download server.";
+    downloadBtn.disabled = false;
+  }
 });
 
-function renderClipsGallery(clips, aiMode) {
-  clipsGallery.innerHTML = "";
-  if (!clips.length) {
-    clipsEmptyState.hidden = false;
-    return;
-  }
-  clipsEmptyState.hidden = true;
-  clipsCountBadge.textContent =
-    aiMode === "groq_ai"
-      ? `${clips.length} AI Viral Clips Ready`
-      : `${clips.length} Vertical Clips Ready`;
-
-  clips.forEach((clip) => {
-    const card = document.createElement("article");
-    card.className = "reel-card";
-    card.innerHTML = `
-      <div class="reel-video-wrap">
-        <video class="reel-video" src="${clip.preview_url}" controls playsinline preload="metadata"></video>
-        <span class="reel-score-pill">Viral ${clip.score}/100</span>
-        <span class="reel-time-pill">${clip.start_str} → ${clip.end_str}</span>
-      </div>
-      <div class="reel-body">
-        <h4 class="reel-title">${clip.title}</h4>
-        <div class="reel-meta">
-          <span>${clip.duration_sec}s • 9:16 HD</span>
-          <span>${clip.has_captions ? "AI Captions ✓" : "FX Only"} • ${clip.size_label}</span>
-        </div>
-        <a class="btn-reel-dl" href="${clip.download_url}" download="${clip.filename}">
-          Download Vertical MP4
-        </a>
-      </div>
-    `;
-    clipsGallery.appendChild(card);
-  });
-}
-
 // History Drawer
-const HISTORY_KEY = "fluxtube_ai_clips_history_v1";
+const HISTORY_KEY = "fluxtube_history_v1";
 
 function getHistory() {
   try {
@@ -338,12 +415,15 @@ function getHistory() {
   }
 }
 
-function saveToHistory(entry) {
-  const items = getHistory();
+function saveToHistory(video) {
+  const items = getHistory().filter((item) => item.id !== video.id);
   items.unshift({
-    name: entry.name,
-    summary: entry.summary,
-    time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    id: video.id,
+    title: video.title,
+    thumbnail: video.thumbnail,
+    uploader: video.uploader,
+    duration_string: video.duration_string,
+    webpage_url: video.webpage_url,
   });
   localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, 12)));
   renderHistory();
@@ -353,21 +433,28 @@ function renderHistory() {
   const items = getHistory();
   historyCount.textContent = items.length;
   if (!items.length) {
-    historyList.innerHTML = `<p class="drawer-empty">No AI clips generated yet.</p>`;
+    historyList.innerHTML = `<p class="drawer-empty">No videos yet.</p>`;
     return;
   }
 
   historyList.innerHTML = "";
   items.forEach((item) => {
-    const row = document.createElement("div");
-    row.className = "history-item";
-    row.innerHTML = `
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "history-item";
+    btn.innerHTML = `
+      <img src="${item.thumbnail || ""}" alt="" />
       <div>
-        <div class="history-item-title">${item.name}</div>
-        <div class="history-item-sub">${item.summary} • ${item.time}</div>
+        <div class="history-item-title">${item.title}</div>
+        <div class="history-item-sub">${item.duration_string}</div>
       </div>
     `;
-    historyList.appendChild(row);
+    btn.addEventListener("click", () => {
+      toggleDrawer(false);
+      urlInput.value = item.webpage_url;
+      inspectUrl(item.webpage_url);
+    });
+    historyList.appendChild(btn);
   });
 }
 

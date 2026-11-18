@@ -1,22 +1,26 @@
-import json
 import os
 import re
 import shutil
-import subprocess
 import tempfile
 import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
-import requests
+import certifi
+import yt_dlp
+from yt_dlp.utils import download_range_func
 from flask import Flask, jsonify, render_template, request, send_file
 
 try:
     import imageio_ffmpeg
 except ImportError:
     imageio_ffmpeg = None
+
+# Ensure yt-dlp uses certifi CA bundle on macOS Python 3.16
+os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
 
 
 def resolve_ffmpeg() -> str:
@@ -29,20 +33,87 @@ def resolve_ffmpeg() -> str:
 
 
 FFMPEG_PATH = resolve_ffmpeg()
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 
 app = Flask(__name__)
-# 250 MB upload cap (keeps Render Free Tier 512 MB RAM safe while supporting podcasts)
-app.config["MAX_CONTENT_LENGTH"] = 250 * 1024 * 1024
 
-WORK_DIR = Path(tempfile.gettempdir()) / "fluxtube_ai_clips"
-WORK_DIR.mkdir(parents=True, exist_ok=True)
+DOWNLOAD_DIR = Path(tempfile.gettempdir()) / "fluxtube_downloads"
+DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+COOKIE_TMP_PATH = Path(tempfile.gettempdir()) / "fluxtube_cookies.txt"
 
-JOBS: Dict[str, dict] = {}
+JOBS = {}
 JOBS_LOCK = threading.Lock()
+CLIENT_CACHE = {}
+
+# Cookieless YouTube InnerTube client fallback chain for cloud servers
+YT_CLIENT_STRATEGIES: List[Optional[List[str]]] = [
+    ["tv_embedded", "web_embedded"],
+    ["ios", "mweb"],
+    ["android_vr", "web"],
+    None,  # yt-dlp default clients
+]
 
 
-def cleanup_old_jobs(max_age_seconds: int = 1200):
+def is_youtube_url(url: str) -> bool:
+    u = (url or "").lower()
+    return "youtube.com" in u or "youtu.be" in u
+
+
+def detect_platform(url: str) -> str:
+    u = (url or "").lower()
+    if "instagram.com" in u:
+        return "Instagram"
+    if "tiktok.com" in u:
+        return "TikTok"
+    if "twitter.com" in u or "x.com" in u:
+        return "X / Twitter"
+    if is_youtube_url(u):
+        return "YouTube"
+    return "Video Link"
+
+
+def get_cookiefile_path() -> Optional[str]:
+    """Optional cookies support if user ever adds Render Secret File or YOUTUBE_COOKIES env var."""
+    secret_file = Path("/etc/secrets/cookies.txt")
+    raw = None
+    if secret_file.is_file():
+        try:
+            raw = secret_file.read_text(encoding="utf-8")
+        except OSError:
+            raw = None
+    if not raw:
+        raw = os.environ.get("YOUTUBE_COOKIES", "").strip()
+    if not raw:
+        return None
+    normalized = raw.replace("\r\n", "\n").replace("\r", "\n")
+    COOKIE_TMP_PATH.write_text(normalized, encoding="utf-8")
+    return str(COOKIE_TMP_PATH)
+
+
+def build_base_ydl_opts(clients: Optional[List[str]] = None) -> dict:
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "source_address": "0.0.0.0",  # Force IPv4 (cloud IPv6 ranges are heavily flagged)
+        "geo_bypass": True,
+        "retries": 3,
+        "fragment_retries": 3,
+    }
+    if clients:
+        opts["extractor_args"] = {"youtube": {"player_client": clients}}
+
+    proxy = os.environ.get("YOUTUBE_PROXY", "").strip()
+    if proxy:
+        opts["proxy"] = proxy
+
+    cookie_file = get_cookiefile_path()
+    if cookie_file:
+        opts["cookiefile"] = cookie_file
+
+    return opts
+
+
+def cleanup_old_jobs(max_age_seconds: int = 1800):
     now = time.time()
     with JOBS_LOCK:
         expired = [
@@ -51,450 +122,195 @@ def cleanup_old_jobs(max_age_seconds: int = 1200):
         ]
         for jid in expired:
             job = JOBS.pop(jid, None)
-            if job and job.get("dir"):
-                shutil.rmtree(job["dir"], ignore_errors=True)
+            if job and job.get("filepath"):
+                try:
+                    Path(job["filepath"]).unlink(missing_ok=True)
+                except OSError:
+                    pass
 
 
-def format_bytes(size: Optional[int]) -> str:
+def format_bytes(size):
     if not size or size <= 0:
-        return "0 B"
-    val = float(size)
+        return None
     for unit in ["B", "KB", "MB", "GB"]:
-        if val < 1024.0:
-            return f"{val:.1f} {unit}" if unit in ("MB", "GB") else f"{int(val)} {unit}"
-        val /= 1024.0
-    return f"{val:.1f} TB"
+        if size < 1024.0:
+            return f"{size:.1f} {unit}" if unit in ("MB", "GB") else f"{int(size)} {unit}"
+        size /= 1024.0
+    return f"{size:.1f} TB"
 
 
-def format_clock(seconds: float) -> str:
-    sec = max(0, int(seconds or 0))
-    h, rem = divmod(sec, 3600)
+def format_duration(seconds):
+    if seconds is None:
+        return "0:00"
+    seconds = max(0, int(seconds))
+    h, rem = divmod(seconds, 3600)
     m, s = divmod(rem, 60)
     if h > 0:
         return f"{h}:{m:02d}:{s:02d}"
     return f"{m}:{s:02d}"
 
 
-def format_ass_time(seconds: float) -> str:
-    sec = max(0.0, float(seconds))
-    h = int(sec // 3600)
-    m = int((sec % 3600) // 60)
-    s = int(sec % 60)
-    cs = int(round((sec - int(sec)) * 100))
-    if cs >= 100:
-        cs = 99
-    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+def parse_timestamp(val) -> Optional[float]:
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return max(0.0, float(val))
+    s = str(val).strip()
+    if not s:
+        return None
+    if re.fullmatch(r"\d+(\.\d+)?", s):
+        return max(0.0, float(s))
+    parts = s.split(":")
+    try:
+        if len(parts) == 2:
+            return max(0.0, int(parts[0]) * 60 + float(parts[1]))
+        if len(parts) == 3:
+            return max(0.0, int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2]))
+    except ValueError:
+        return None
+    return None
 
 
 def sanitize_filename(name: str) -> str:
-    stem = Path(name or "clip").stem
-    cleaned = re.sub(r'[\\/*?:"<>|]+', "", stem).strip()[:60]
-    return cleaned or "clip"
+    return re.sub(r'[\\/*?:"<>|]+', "", name).strip()[:110] or "video"
 
 
-def update_job(job_id: str, **kwargs):
-    with JOBS_LOCK:
-        job = JOBS.get(job_id)
-        if job:
-            job.update(kwargs)
+def get_exact_stream_size(fmt: dict, duration: float, is_audio: bool = False) -> int:
+    if not fmt:
+        return 0
+    if fmt.get("filesize"):
+        return int(fmt["filesize"])
+    if fmt.get("filesize_approx"):
+        return int(fmt["filesize_approx"])
+    bitrate = fmt.get("abr") if is_audio else (fmt.get("vbr") or fmt.get("tbr"))
+    if bitrate and duration:
+        return int((bitrate * 1000 / 8) * duration)
+    return 0
 
 
-def probe_duration(video_path: Path, fallback: float = 60.0) -> float:
-    try:
-        res = subprocess.run(
-            [FFMPEG_PATH, "-i", str(video_path)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=15,
-        )
-        m = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", res.stderr or "")
-        if m:
-            return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
-    except Exception:
-        pass
-    return max(5.0, float(fallback or 60.0))
+def build_quality_options(info: dict):
+    formats = info.get("formats") or []
+    duration = info.get("duration") or 0
 
-
-def extract_audio_for_groq(video_path: Path, audio_path: Path) -> bool:
-    """Extract lightweight mono 32kbps MP3 (~14 MB per hour, fits Groq's 25 MB free limit)."""
-    cmd = [
-        FFMPEG_PATH, "-y",
-        "-i", str(video_path),
-        "-vn", "-ac", "1", "-ar", "16000", "-b:a", "32k",
-        str(audio_path),
+    m4a_audios = [
+        f for f in formats
+        if f.get("acodec") not in (None, "none")
+        and f.get("vcodec") in (None, "none")
+        and f.get("ext") == "m4a"
     ]
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=180)
-    return res.returncode == 0 and audio_path.exists() and audio_path.stat().st_size < 24 * 1024 * 1024
+    all_audios = [
+        f for f in formats
+        if f.get("acodec") not in (None, "none") and f.get("vcodec") in (None, "none")
+    ]
+    best_m4a = max(m4a_audios, key=lambda f: f.get("abr") or 0, default=None)
+    best_any_audio = max(all_audios, key=lambda f: f.get("abr") or 0, default=None)
+    chosen_audio = best_m4a or best_any_audio
+    best_audio_size = get_exact_stream_size(chosen_audio, duration, is_audio=True)
 
+    by_height = {}
+    for f in formats:
+        vcodec = f.get("vcodec")
+        height = f.get("height")
+        if vcodec == "none" or not height or height < 144:
+            continue
 
-def transcribe_with_groq(audio_path: Path, api_key: str) -> Optional[dict]:
-    url = "https://api.groq.com/openai/v1/audio/transcriptions"
-    headers = {"Authorization": f"Bearer {api_key}"}
-    try:
-        with open(audio_path, "rb") as f:
-            files = {"file": (audio_path.name, f, "audio/mpeg")}
-            data = [
-                ("model", "whisper-large-v3-turbo"),
-                ("response_format", "verbose_json"),
-                ("timestamp_granularities[]", "word"),
-                ("timestamp_granularities[]", "segment"),
-            ]
-            resp = requests.post(url, headers=headers, files=files, data=data, timeout=180)
-        if resp.status_code == 200:
-            return resp.json()
-    except Exception:
-        pass
-    return None
+        ext = f.get("ext", "")
+        fps = f.get("fps") or 30
+        has_exact_size = 1 if f.get("filesize") else 0
+        is_mp4 = 1 if ext == "mp4" else 0
+        tbr = f.get("tbr") or 0
 
+        score = (is_mp4, has_exact_size, 1 if fps >= 50 else 0, tbr)
+        existing = by_height.get(height)
+        if not existing or score > existing["_score"]:
+            video_size = get_exact_stream_size(f, duration, is_audio=False)
+            has_audio = f.get("acodec") not in (None, "none")
+            total_bytes = video_size + (0 if (has_audio or not video_size) else best_audio_size)
+            by_height[height] = {
+                "format_id": f.get("format_id"),
+                "height": height,
+                "fps": int(fps) if fps else 30,
+                "size_bytes": total_bytes,
+                "size_label": format_bytes(total_bytes) or "Auto",
+                "has_audio": has_audio,
+                "_score": score,
+            }
 
-def pick_viral_clips_with_groq(
-    transcript: dict,
-    total_duration: float,
-    num_clips: int,
-    clip_len: int,
-    api_key: str,
-) -> Optional[List[dict]]:
-    segments = transcript.get("segments") or []
-    if not segments:
-        return None
-
-    lines = []
-    for seg in segments[:260]:
-        st = round(float(seg.get("start", 0)), 1)
-        en = round(float(seg.get("end", 0)), 1)
-        txt = (seg.get("text") or "").strip()
-        if txt:
-            lines.append(f"[{st}s - {en}s] {txt}")
-    condensed = "\n".join(lines)[:14000]
-
-    prompt = (
-        f"You are an expert short-form viral podcast editor. "
-        f"Pick the {num_clips} most engaging, high-retention moments from this transcript "
-        f"(total video length {int(total_duration)}s). "
-        f"Each clip MUST be approximately {clip_len} seconds long (between {max(12, clip_len - 5)}s and {clip_len + 5}s), "
-        f"non-overlapping, and start on a strong hook.\n"
-        f"Return ONLY valid JSON array of objects with exact keys: "
-        f"start (number in seconds), end (number in seconds), title (short catchy 4-7 word title), score (integer 82-99).\n\n"
-        f"Transcript:\n{condensed}"
-    )
-
-    try:
-        resp = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "llama-3.1-8b-instant",
-                "temperature": 0.3,
-                "messages": [
-                    {"role": "system", "content": "Return ONLY a raw JSON array with no markdown fences."},
-                    {"role": "user", "content": prompt},
-                ],
-            },
-            timeout=60,
-        )
-        if resp.status_code != 200:
-            return None
-        content = resp.json()["choices"][0]["message"]["content"].strip()
-        match = re.search(r"\[.*\]", content, re.S)
-        raw = json.loads(match.group(0) if match else content)
-        clips = []
-        for item in raw[:num_clips]:
-            st = max(0.0, float(item.get("start", 0)))
-            en = min(total_duration, float(item.get("end", st + clip_len)))
-            if en - st < 8:
-                en = min(total_duration, st + clip_len)
-            if en - st > clip_len + 8:
-                en = min(total_duration, st + clip_len)
-            clips.append({
-                "start": round(st, 2),
-                "end": round(en, 2),
-                "title": str(item.get("title") or "Viral Podcast Moment")[:64],
-                "score": int(item.get("score") or 91),
-            })
-        return clips if clips else None
-    except Exception:
-        return None
-
-
-def build_fallback_clips(total_duration: float, num_clips: int, clip_len: int) -> List[dict]:
-    """Smart evenly-spaced highlight selector when GROQ_API_KEY is not configured."""
-    dur = max(10.0, total_duration)
-    eff_len = min(float(clip_len), dur)
-    if dur <= eff_len + 4 or num_clips == 1:
-        start = max(0.0, (dur - eff_len) * 0.15)
-        return [{
-            "start": round(start, 2),
-            "end": round(min(dur, start + eff_len), 2),
-            "title": "Featured Vertical Highlight",
-            "score": 92,
-        }]
-
-    usable_start = min(dur * 0.08, 15.0)
-    usable_end = max(usable_start + eff_len, dur - min(dur * 0.05, 10.0))
-    span = max(0.0, usable_end - usable_start - eff_len)
-    step = span / max(1, num_clips - 1)
-
-    labels = ["Opening Hook Highlight", "Key Podcast Insight", "High-Impact Takeaway"]
-    clips = []
-    for i in range(num_clips):
-        st = round(usable_start + step * i, 2)
-        en = round(min(dur, st + eff_len), 2)
-        clips.append({
-            "start": st,
-            "end": en,
-            "title": labels[i % len(labels)],
-            "score": 94 - i * 3,
-        })
-    return clips
-
-
-def generate_ass_subtitles(
-    transcript: Optional[dict],
-    clip_start: float,
-    clip_end: float,
-    ass_path: Path,
-    caption_style: str,
-) -> bool:
-    if caption_style == "none" or not transcript:
-        return False
-
-    style_map = {
-        "viral_yellow": ("&H0000E5FF", "&H00000000"),
-        "crimson_pop": ("&H006C3EFF", "&H00000000"),
-        "clean_white": ("&H00FFFFFF", "&H00000000"),
+    tier_labels = {
+        2160: ("4K UHD", "2160p", "ULTRA"),
+        1440: ("2K QHD", "1440p", "PRO"),
+        1080: ("Full HD", "1080p", "HD+"),
+        720: ("HD", "720p", "FAST"),
+        480: ("SD", "480p", "LITE"),
+        360: ("Compact", "360p", "DATA"),
+        240: ("Low", "240p", "MINI"),
     }
-    primary_col, outline_col = style_map.get(caption_style, style_map["viral_yellow"])
 
-    words = transcript.get("words") or []
-    clip_words = [
-        w for w in words
-        if float(w.get("end", 0)) > clip_start and float(w.get("start", 0)) < clip_end
-    ]
+    options = []
+    for h in sorted(by_height.keys(), reverse=True):
+        if h not in tier_labels and h < 360 and len(by_height) > 2:
+            continue
+        item = by_height[h]
+        title, res, badge = tier_labels.get(h, (f"{h}p", f"{h}p", "HD"))
+        options.append({
+            "id": f"video_{h}",
+            "format_id": item["format_id"],
+            "audio_id": None if item["has_audio"] else (chosen_audio.get("format_id") if chosen_audio else None),
+            "type": "video",
+            "title": title,
+            "resolution": res,
+            "height": h,
+            "fps": item["fps"],
+            "badge": f"{badge} • {item['fps']}FPS" if item["fps"] >= 50 else badge,
+            "ext": "MP4",
+            "size": item["size_label"],
+            "size_bytes": item["size_bytes"],
+        })
 
-    events = []
-    if clip_words:
-        chunk_size = 3
-        for i in range(0, len(clip_words), chunk_size):
-            chunk = clip_words[i:i + chunk_size]
-            st = max(0.0, float(chunk[0].get("start", clip_start)) - clip_start)
-            en = max(st + 0.25, float(chunk[-1].get("end", clip_start + 0.5)) - clip_start)
-            text = " ".join((w.get("word") or "").strip() for w in chunk).strip().upper()
-            text = text.replace("{", "").replace("}", "").replace("\n", " ")
-            if text:
-                events.append((st, en, text))
-    else:
-        for seg in (transcript.get("segments") or []):
-            if float(seg.get("end", 0)) > clip_start and float(seg.get("start", 0)) < clip_end:
-                st = max(0.0, float(seg.get("start", clip_start)) - clip_start)
-                en = max(st + 0.5, float(seg.get("end", clip_start + 1.0)) - clip_start)
-                text = (seg.get("text") or "").strip().upper().replace("\n", " ")
-                if text:
-                    events.append((st, en, text[:48]))
+    if not options:
+        best_size = get_exact_stream_size(info, duration, is_audio=False)
+        options.append({
+            "id": "video_best",
+            "format_id": info.get("format_id"),
+            "audio_id": None,
+            "type": "video",
+            "title": "Original HD",
+            "resolution": f"{info.get('height')}p" if info.get("height") else "Best",
+            "height": info.get("height") or 1080,
+            "fps": int(info.get("fps") or 30),
+            "badge": "ORIGINAL",
+            "ext": "MP4",
+            "size": format_bytes(best_size) or "Auto",
+            "size_bytes": best_size,
+        })
 
-    if not events:
-        return False
+    mp3_bytes = best_audio_size if best_audio_size else (int((192 * 1000 / 8) * duration) if duration else 0)
+    options.append({
+        "id": "audio_mp3",
+        "type": "audio",
+        "title": "Audio MP3",
+        "resolution": "MP3",
+        "height": 0,
+        "fps": 0,
+        "badge": "AUDIO",
+        "ext": "MP3",
+        "size": format_bytes(mp3_bytes) or "Auto",
+        "size_bytes": mp3_bytes,
+    })
+    options.append({
+        "id": "audio_m4a",
+        "type": "audio",
+        "title": "Audio M4A",
+        "resolution": "M4A",
+        "height": 0,
+        "fps": 0,
+        "badge": "AAC",
+        "ext": "M4A",
+        "size": format_bytes(best_audio_size) or "Auto",
+        "size_bytes": best_audio_size,
+    })
 
-    header = f"""[Script Info]
-ScriptType: v4.00+
-PlayResX: 720
-PlayResY: 1280
-ScaledBorderAndShadow: yes
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,DejaVu Sans,54,{primary_col},&H00FFFFFF,{outline_col},&H96000000,-1,0,0,0,100,100,1,0,1,4.5,2.5,2,42,42,210,1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-"""
-    body_lines = [
-        f"Dialogue: 0,{format_ass_time(st)},{format_ass_time(en)},Default,,0,0,0,,{txt}"
-        for st, en, txt in events
-    ]
-    ass_path.write_text(header + "\n".join(body_lines) + "\n", encoding="utf-8")
-    return True
-
-
-def render_vertical_clip(
-    input_path: Path,
-    output_path: Path,
-    start_sec: float,
-    end_sec: float,
-    framing: str,
-    effect: str,
-    ass_path: Optional[Path],
-) -> Optional[str]:
-    clip_dur = max(1.0, end_sec - start_sec)
-
-    fx_filters = []
-    if effect == "cinematic":
-        fx_filters.append("eq=contrast=1.08:saturation=1.18:brightness=0.01")
-        fx_filters.append("vignette=PI/5")
-    elif effect == "warm_podcast":
-        fx_filters.append("eq=contrast=1.06:saturation=1.12:brightness=0.02")
-        fx_filters.append("colorbalance=rs=0.04:gs=0.01:bs=-0.04")
-
-    if effect in ("cinematic", "warm_podcast"):
-        fx_filters.append(
-            f"drawbox=x=0:y=ih-12:w='iw*min(1,t/{clip_dur:.2f})':h=12:color=#FF3E6C@0.92:t=fill"
-        )
-
-    if ass_path and ass_path.exists():
-        esc_ass = str(ass_path).replace("\\", "/").replace(":", "\\:")
-        fx_filters.append(f"ass='{esc_ass}'")
-
-    post_chain = ("," + ",".join(fx_filters)) if fx_filters else ""
-
-    if framing == "blur_bg":
-        filter_complex = (
-            "[0:v]split=2[bg][fg];"
-            "[bg]scale=720:1280:force_original_aspect_ratio=increase,"
-            "crop=720:1280,boxblur=22:4,eq=brightness=-0.12[bg_blur];"
-            "[fg]scale=720:-2:force_original_aspect_ratio=decrease[fg_scaled];"
-            f"[bg_blur][fg_scaled]overlay=(W-w)/2:(H-h)/2{post_chain}[vout]"
-        )
-    else:
-        filter_complex = (
-            f"[0:v]scale=720:1280:force_original_aspect_ratio=increase,"
-            f"crop=720:1280{post_chain}[vout]"
-        )
-
-    cmd = [
-        FFMPEG_PATH, "-y",
-        "-ss", f"{start_sec:.2f}",
-        "-t", f"{clip_dur:.2f}",
-        "-i", str(input_path),
-        "-filter_complex", filter_complex,
-        "-map", "[vout]",
-        "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24",
-        "-r", "30",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "128k",
-        "-movflags", "+faststart",
-        str(output_path),
-    ]
-
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=240)
-    if res.returncode != 0 or not output_path.exists():
-        lines = (res.stderr or "FFmpeg render failed").strip().splitlines()
-        return lines[-1] if lines else "Render failed"
-    return None
-
-
-def run_ai_clip_job(
-    job_id: str,
-    job_dir: Path,
-    input_path: Path,
-    orig_name: str,
-    duration_hint: float,
-    num_clips: int,
-    clip_len: int,
-    framing: str,
-    caption_style: str,
-    effect: str,
-):
-    try:
-        update_job(job_id, status="processing", progress=8, stage="Analyzing podcast video...")
-        total_dur = probe_duration(input_path, fallback=duration_hint)
-        api_key = os.environ.get("GROQ_API_KEY", "").strip() or GROQ_API_KEY
-
-        transcript = None
-        ai_mode = "smart_auto"
-        selected_clips = None
-
-        if api_key:
-            update_job(job_id, progress=16, stage="Extracting audio for AI speech recognition...")
-            audio_path = job_dir / "audio.mp3"
-            if extract_audio_for_groq(input_path, audio_path):
-                update_job(job_id, progress=28, stage="AI transcribing speech (Groq Whisper)...")
-                transcript = transcribe_with_groq(audio_path, api_key)
-                try:
-                    audio_path.unlink(missing_ok=True)
-                except OSError:
-                    pass
-
-            if transcript:
-                update_job(job_id, progress=42, stage="AI picking best viral 30s hooks...")
-                selected_clips = pick_viral_clips_with_groq(
-                    transcript, total_dur, num_clips, clip_len, api_key
-                )
-                ai_mode = "groq_ai"
-
-        if not selected_clips:
-            selected_clips = build_fallback_clips(total_dur, num_clips, clip_len)
-
-        safe_stem = sanitize_filename(orig_name)
-        rendered_clips = []
-        total_to_render = len(selected_clips)
-
-        for idx, clip in enumerate(selected_clips):
-            pct = 48 + int((idx / max(1, total_to_render)) * 46)
-            update_job(
-                job_id,
-                progress=pct,
-                stage=f"Rendering Vertical Clip {idx + 1}/{total_to_render} (9:16 + Captions + FX)...",
-            )
-
-            ass_path = job_dir / f"clip_{idx + 1}.ass"
-            has_subs = generate_ass_subtitles(
-                transcript, clip["start"], clip["end"], ass_path, caption_style
-            )
-
-            out_name = f"{safe_stem}_clip{idx + 1}_9x16.mp4"
-            out_path = job_dir / out_name
-            err = render_vertical_clip(
-                input_path=input_path,
-                output_path=out_path,
-                start_sec=clip["start"],
-                end_sec=clip["end"],
-                framing=framing,
-                effect=effect,
-                ass_path=ass_path if has_subs else None,
-            )
-            if err:
-                raise RuntimeError(err)
-
-            size_bytes = out_path.stat().st_size
-            rendered_clips.append({
-                "index": idx,
-                "title": clip["title"],
-                "score": clip["score"],
-                "start_str": format_clock(clip["start"]),
-                "end_str": format_clock(clip["end"]),
-                "duration_sec": int(round(clip["end"] - clip["start"])),
-                "has_captions": has_subs,
-                "filename": out_name,
-                "filepath": str(out_path),
-                "size_label": format_bytes(size_bytes),
-                "preview_url": f"/api/clip/{job_id}/{idx}/preview",
-                "download_url": f"/api/clip/{job_id}/{idx}/download",
-            })
-
-        update_job(
-            job_id,
-            status="completed",
-            progress=100,
-            stage=f"Done — {len(rendered_clips)} vertical 9:16 clips ready!",
-            ai_mode=ai_mode,
-            clips=rendered_clips,
-        )
-    except Exception as exc:
-        update_job(job_id, status="error", error=str(exc), stage="Generation failed")
-    finally:
-        try:
-            input_path.unlink(missing_ok=True)
-        except OSError:
-            pass
-
-
-@app.errorhandler(413)
-def file_too_large(_e):
-    return jsonify({"error": "File is over 250 MB. Please upload a smaller podcast file."}), 413
+    return options
 
 
 @app.route("/")
@@ -504,110 +320,287 @@ def index():
 
 @app.route("/api/health")
 def health():
-    has_groq = bool(os.environ.get("GROQ_API_KEY", "").strip() or GROQ_API_KEY)
     return jsonify({
         "status": "ok",
         "ffmpeg": bool(FFMPEG_PATH and (os.path.exists(FFMPEG_PATH) or shutil.which(FFMPEG_PATH))),
-        "ai_captions_enabled": has_groq,
+        "deno": bool(shutil.which("deno")),
+        "yt_dlp": yt_dlp.version.__version__,
     })
 
 
-@app.route("/api/generate-clips", methods=["POST"])
-def generate_clips():
+@app.route("/api/info", methods=["POST"])
+def get_info():
     cleanup_old_jobs()
+    data = request.get_json(silent=True) or {}
+    url = (data.get("url") or "").strip()
+    if not url:
+        return jsonify({"error": "Please paste a valid YouTube, Instagram, TikTok, or X link."}), 400
 
-    upload = request.files.get("file")
-    if not upload or not upload.filename:
-        return jsonify({"error": "Please upload a podcast or video file first."}), 400
+    strategies = YT_CLIENT_STRATEGIES if is_youtube_url(url) else [None]
+    info = None
+    last_err = None
+    winning_clients = None
 
-    num_clips = max(1, min(3, int(request.form.get("num_clips") or 3)))
-    clip_len = max(15, min(60, int(request.form.get("clip_len") or 30)))
-    framing = (request.form.get("framing") or "blur_bg").strip()
-    caption_style = (request.form.get("caption_style") or "viral_yellow").strip()
-    effect = (request.form.get("effect") or "cinematic").strip()
-    duration_hint = float(request.form.get("duration") or 60)
+    for clients in strategies:
+        ydl_opts = build_base_ydl_opts(clients)
+        ydl_opts["skip_download"] = True
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                extracted = ydl.extract_info(url, download=False)
+            if extracted:
+                info = extracted
+                winning_clients = clients
+                break
+        except Exception as exc:
+            last_err = str(exc)
+            continue
+
+    if not info:
+        msg = last_err or "Could not fetch video metadata."
+        if "confirm you" in msg.lower() and "bot" in msg.lower():
+            msg = (
+                "YouTube temporarily blocked this cloud server's IP across all clients. "
+                "Try again in a moment, or test with an Instagram / TikTok / X link."
+            )
+        return jsonify({"error": msg}), 400
+
+    webpage_url = info.get("webpage_url") or url
+    CLIENT_CACHE[webpage_url] = winning_clients
+    CLIENT_CACHE[url] = winning_clients
+
+    qualities = build_quality_options(info)
+    return jsonify({
+        "id": info.get("id"),
+        "platform": detect_platform(url),
+        "title": info.get("title") or "Untitled Video",
+        "thumbnail": info.get("thumbnail"),
+        "duration": info.get("duration") or 0,
+        "duration_string": format_duration(info.get("duration")),
+        "uploader": info.get("uploader") or info.get("channel") or "Creator",
+        "webpage_url": webpage_url,
+        "qualities": qualities,
+    })
+
+
+def run_download_job(
+    job_id: str,
+    url: str,
+    quality_id: str,
+    title: str,
+    format_id: Optional[str] = None,
+    audio_id: Optional[str] = None,
+    start_sec: Optional[float] = None,
+    end_sec: Optional[float] = None,
+):
+    job_dir = DOWNLOAD_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    safe_title = sanitize_filename(title)
+
+    is_clipped = start_sec is not None and end_sec is not None and end_sec > start_sec
+    clip_suffix = ""
+    if is_clipped:
+        clip_suffix = f" [{format_duration(start_sec).replace(':', '-')}_to_{format_duration(end_sec).replace(':', '-')}]"
+
+    outtmpl = str(job_dir / f"{safe_title}{clip_suffix}.%(ext)s")
+
+    def progress_hook(d):
+        status = d.get("status")
+        with JOBS_LOCK:
+            job = JOBS.get(job_id)
+            if not job:
+                return
+            if status == "downloading":
+                total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+                downloaded = d.get("downloaded_bytes") or 0
+                pct = (downloaded / total * 100) if total else 50.0
+                speed = d.get("speed")
+                eta = d.get("eta")
+                job["status"] = "downloading"
+                job["progress"] = round(min(pct, 98.0), 1)
+                job["speed"] = f"{format_bytes(speed)}/s" if speed else "Clipping..."
+                job["eta"] = f"{int(eta)}s" if eta is not None else "—"
+            elif status == "finished":
+                job["status"] = "processing"
+                job["progress"] = 99.0
+                job["speed"] = "Trimming & Muxing" if is_clipped else "Muxing"
+                job["eta"] = "Almost done"
+
+    cached = CLIENT_CACHE.get(url)
+    if is_youtube_url(url):
+        strategies = [cached] + [s for s in YT_CLIENT_STRATEGIES if s != cached]
+    else:
+        strategies = [None]
+
+    last_err = None
+    for clients in strategies:
+        ydl_opts = build_base_ydl_opts(clients)
+        ydl_opts["outtmpl"] = outtmpl
+        ydl_opts["ffmpeg_location"] = FFMPEG_PATH
+        ydl_opts["progress_hooks"] = [progress_hook]
+
+        if is_clipped:
+            ydl_opts["download_ranges"] = download_range_func(None, [(start_sec, end_sec)])
+            ydl_opts["force_keyframes_at_cuts"] = True
+
+        if quality_id == "audio_mp3":
+            ydl_opts["format"] = "bestaudio/best"
+            ydl_opts["postprocessors"] = [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }]
+        elif quality_id == "audio_m4a":
+            ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
+            ydl_opts["postprocessors"] = [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "m4a",
+            }]
+        elif quality_id.startswith("video_"):
+            height = quality_id.split("_", 1)[1]
+            if format_id and audio_id:
+                exact_combo = f"{format_id}+{audio_id}"
+            elif format_id:
+                exact_combo = format_id
+            else:
+                exact_combo = None
+
+            if height.isdigit():
+                fallback_combo = (
+                    f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/"
+                    f"bestvideo[height<={height}]+bestaudio/"
+                    f"best[height<={height}]/best"
+                )
+            else:
+                fallback_combo = "bestvideo+bestaudio/best"
+
+            ydl_opts["format"] = f"{exact_combo}/{fallback_combo}" if exact_combo else fallback_combo
+            ydl_opts["merge_output_format"] = "mp4"
+        else:
+            ydl_opts["format"] = "bestvideo+bestaudio/best"
+            ydl_opts["merge_output_format"] = "mp4"
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+
+            files = [p for p in job_dir.iterdir() if p.is_file()]
+            if not files:
+                raise RuntimeError("Output file was not created.")
+            final_file = max(files, key=lambda p: p.stat().st_size)
+
+            with JOBS_LOCK:
+                job = JOBS.get(job_id)
+                if job:
+                    job["status"] = "completed"
+                    job["progress"] = 100.0
+                    job["filepath"] = str(final_file)
+                    job["filename"] = final_file.name
+                    job["actual_size"] = format_bytes(final_file.stat().st_size)
+                    job["speed"] = "Complete"
+                    job["eta"] = "0s"
+            return
+        except Exception as exc:
+            last_err = str(exc)
+            # Clear partial files before trying next client strategy
+            for p in job_dir.iterdir():
+                if p.is_file():
+                    try:
+                        p.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+            continue
+
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job:
+            job["status"] = "error"
+            job["error"] = last_err or "Download failed across all clients."
+
+
+@app.route("/api/download", methods=["POST"])
+def start_download():
+    data = request.get_json(silent=True) or {}
+    url = (data.get("url") or "").strip()
+    quality_id = (data.get("quality_id") or "video_1080").strip()
+    title = (data.get("title") or "video").strip()
+    format_id = data.get("format_id")
+    audio_id = data.get("audio_id")
+
+    start_sec = parse_timestamp(data.get("start_time"))
+    end_sec = parse_timestamp(data.get("end_time"))
+    duration = float(data.get("duration") or 0)
+
+    clip_requested = False
+    if start_sec is not None and end_sec is not None:
+        if end_sec <= start_sec:
+            return jsonify({"error": "End time must be greater than Start time."}), 400
+        if start_sec > 0 or (duration > 0 and end_sec < int(duration)):
+            clip_requested = True
+
+    if not url:
+        return jsonify({"error": "Missing video URL."}), 400
 
     job_id = uuid.uuid4().hex[:12]
-    job_dir = WORK_DIR / job_id
-    job_dir.mkdir(parents=True, exist_ok=True)
-
-    orig_ext = Path(upload.filename).suffix.lower() or ".mp4"
-    if len(orig_ext) > 8 or not re.fullmatch(r"\.[a-z0-9]+", orig_ext):
-        orig_ext = ".mp4"
-
-    input_path = job_dir / f"source{orig_ext}"
-    upload.save(str(input_path))
-
     with JOBS_LOCK:
         JOBS[job_id] = {
             "id": job_id,
-            "dir": str(job_dir),
             "status": "queued",
-            "progress": 5,
-            "stage": "Queued for AI clipping...",
-            "ai_mode": None,
-            "clips": [],
+            "progress": 0.0,
+            "speed": "Starting...",
+            "eta": "—",
+            "filepath": None,
+            "filename": None,
+            "actual_size": None,
             "error": None,
             "created_at": time.time(),
         }
 
     thread = threading.Thread(
-        target=run_ai_clip_job,
+        target=run_download_job,
         args=(
             job_id,
-            job_dir,
-            input_path,
-            upload.filename,
-            duration_hint,
-            num_clips,
-            clip_len,
-            framing,
-            caption_style,
-            effect,
+            url,
+            quality_id,
+            title,
+            format_id,
+            audio_id,
+            start_sec if clip_requested else None,
+            end_sec if clip_requested else None,
         ),
         daemon=True,
     )
     thread.start()
+    return jsonify({"job_id": job_id})
 
-    return jsonify({"ok": True, "job_id": job_id})
 
-
-@app.route("/api/job/<job_id>")
-def get_job_status(job_id):
+@app.route("/api/progress/<job_id>")
+def get_progress(job_id):
     with JOBS_LOCK:
         job = JOBS.get(job_id)
         if not job:
-            return jsonify({"error": "Job not found or expired."}), 404
-        public_clips = [
-            {k: v for k, v in c.items() if k != "filepath"}
-            for c in (job.get("clips") or [])
-        ]
+            return jsonify({"error": "Job not found"}), 404
         return jsonify({
             "id": job["id"],
             "status": job["status"],
             "progress": job["progress"],
-            "stage": job["stage"],
-            "ai_mode": job["ai_mode"],
-            "clips": public_clips,
+            "speed": job["speed"],
+            "eta": job["eta"],
+            "filename": job["filename"],
+            "actual_size": job["actual_size"],
             "error": job["error"],
         })
 
 
-@app.route("/api/clip/<job_id>/<int:idx>/<action>")
-def serve_clip(job_id, idx, action):
+@app.route("/api/file/<job_id>")
+def download_file(job_id):
     with JOBS_LOCK:
         job = JOBS.get(job_id)
-        if not job or idx < 0 or idx >= len(job.get("clips") or []):
-            return jsonify({"error": "Clip not found or expired."}), 404
-        clip = job["clips"][idx]
-        filepath = clip["filepath"]
-        filename = clip["filename"]
+        if not job or job["status"] != "completed" or not job["filepath"]:
+            return jsonify({"error": "File not ready or expired"}), 404
+        filepath = job["filepath"]
+        filename = job["filename"]
 
-    if not os.path.exists(filepath):
-        return jsonify({"error": "Clip file expired."}), 404
-
-    as_attachment = action == "download"
-    return send_file(filepath, as_attachment=as_attachment, download_name=filename, mimetype="video/mp4")
+    return send_file(filepath, as_attachment=True, download_name=filename)
 
 
 if __name__ == "__main__":

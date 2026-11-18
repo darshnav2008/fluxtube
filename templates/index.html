@@ -74,67 +74,68 @@
         </div>
 
         <h1 class="hero-title">
-          Turn podcasts into <span class="serif-italic">viral</span><br />30s vertical clips
+          Download <span class="serif-italic">video</span><br />professionally
         </h1>
 
-        <div class="hero-subline">UPLOAD PODCAST • AI HOOKS • 9:16 CAPTIONS • FX</div>
+        <div class="hero-subline">PASTE • DOWNLOAD • ENJOY</div>
       </div>
 
       <div class="command-bar-wrap">
-        <div class="upload-drop-box" id="dropZoneBar" role="button" tabindex="0">
-          <input type="file" id="videoFileInput" accept="video/*,.mp4,.mov,.webm,.mkv,.m4v" hidden />
-          <div class="upload-icon-ring">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="17 8 12 3 7 8"></polyline>
-              <line x1="12" y1="3" x2="12" y2="15"></line>
+        <form class="command-bar" id="analyzeForm">
+          <span class="command-icon">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
             </svg>
-          </div>
-          <div class="upload-copy">
-            <div class="upload-title" id="dropFileLabel">Drag &amp; drop your podcast video here</div>
-            <div class="upload-sub">MP4, MOV, WebM, MKV • Up to 250 MB • Auto 9:16 Reels &amp; Shorts</div>
-          </div>
-          <button type="button" class="btn-primary upload-cta-btn" id="pickFileBtn">
-            <span class="btn-label">Upload Podcast →</span>
+          </span>
+          <input
+            type="url"
+            id="urlInput"
+            class="command-input"
+            placeholder="Paste YouTube, Instagram, TikTok or X link..."
+            autocomplete="off"
+            required
+          />
+          <button type="button" class="btn-ghost" id="pasteBtn" title="Paste from clipboard">
+            Paste
           </button>
-        </div>
+          <button type="submit" class="btn-primary" id="analyzeBtn">
+            <span class="btn-label">Fetch →</span>
+            <span class="btn-spinner" hidden></span>
+          </button>
+        </form>
         <div class="error-banner" id="errorBanner" hidden></div>
       </div>
 
       <div class="hero-landing-only" id="heroBottom">
         <div class="platforms-block">
-          <div class="section-hairline-label">Built-In AI Pipeline</div>
+          <div class="section-hairline-label">Supported Platforms</div>
           <div class="platforms-logos">
             <span class="platform-chip">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 2L14.3 9.7L22 12L14.3 14.3L12 22L9.7 14.3L2 12L9.7 9.7L12 2Z"></path>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/>
               </svg>
-              <span>AI Viral Hooks</span>
+              <span>YouTube</span>
             </span>
             <span class="platform-chip">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="6" y="2" width="12" height="20" rx="2"></rect>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
+                <rect x="2" y="2" width="20" height="20" rx="5"></rect>
+                <circle cx="12" cy="12" r="4"></circle>
+                <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"></circle>
               </svg>
-              <span>9:16 Vertical</span>
+              <span>Instagram</span>
             </span>
             <span class="platform-chip">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
-                <line x1="6" y1="12" x2="12" y2="12"></line>
-                <line x1="15" y1="12" x2="18" y2="12"></line>
-                <line x1="6" y1="15" x2="15" y2="15"></line>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z"/>
               </svg>
-              <span>Bold Captions</span>
+              <span>TikTok</span>
             </span>
             <span class="platform-chip">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="5"></circle>
-                <line x1="12" y1="1" x2="12" y2="3"></line>
-                <line x1="12" y1="21" x2="12" y2="23"></line>
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
               </svg>
-              <span>Studio FX</span>
+              <span>X / Twitter</span>
             </span>
           </div>
         </div>
@@ -143,7 +144,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm-1.06 13.54L7.4 12l1.41-1.41 2.12 2.12 4.24-4.24 1.41 1.41-5.64 5.66z"/>
           </svg>
-          <span>NO LOGIN • NO WATERMARK • 100% FREE</span>
+          <span>NO VIRUS • NO MALWARE • NO HIDDEN FILES</span>
         </div>
       </div>
     </section>
@@ -151,42 +152,43 @@
     <section class="intro-bento" id="introBento">
       <article class="intro-card spotlight-card">
         <div class="intro-top-row">
-          <span class="intro-num">01 / AI VIRAL HOOKS</span>
-          <span class="intro-chip">30s AUTO</span>
+          <span class="intro-num">01 / QUALITY MATRIX</span>
+          <span class="intro-chip">REAL SIZE</span>
         </div>
-        <h3>Best Podcast Moments</h3>
-        <p>AI transcribes speech and finds high-retention 30-second hooks automatically from long videos.</p>
-        <div class="mini-timeline">
-          <span class="mini-time">02:14</span>
-          <div class="mini-bar"><div class="mini-bar-fill"></div></div>
-          <span class="mini-time">02:44</span>
-        </div>
-      </article>
-
-      <article class="intro-card spotlight-card">
-        <div class="intro-top-row">
-          <span class="intro-num">02 / 9:16 VERTICAL</span>
-          <span class="intro-chip">REELS / SHORTS</span>
-        </div>
-        <h3>Podcast-Ready Framing</h3>
-        <p>Convert horizontal podcasts into crisp 9:16 vertical videos with Blur BG or Center Crop.</p>
+        <h3>4K UHD to 320k Audio</h3>
+        <p>Inspect every available resolution with accurate file sizes before you download.</p>
         <div class="mini-quality-row">
-          <span class="mini-q active">9:16 Blur BG</span>
-          <span class="mini-q">Center Crop</span>
-          <span class="mini-q">30fps HD</span>
+          <span class="mini-q active">2160p 4K</span>
+          <span class="mini-q">1440p</span>
+          <span class="mini-q">1080p</span>
+          <span class="mini-q">MP3</span>
         </div>
       </article>
 
       <article class="intro-card spotlight-card">
         <div class="intro-top-row">
-          <span class="intro-num">03 / CAPTIONS &amp; FX</span>
-          <span class="intro-chip">BURNED-IN</span>
+          <span class="intro-num">02 / TIME CLIPPER</span>
+          <span class="intro-chip">DIRECT</span>
         </div>
-        <h3>Subtitles + Studio Look</h3>
-        <p>Auto word-by-word bold captions, cinematic contrast, vignette, and a crimson progress bar.</p>
+        <h3>Exact Start-to-End Cut</h3>
+        <p>Slide or type custom timestamps to download only the exact clip you need.</p>
+        <div class="mini-timeline">
+          <span class="mini-time">0:30</span>
+          <div class="mini-bar"><div class="mini-bar-fill"></div></div>
+          <span class="mini-time">2:15</span>
+        </div>
+      </article>
+
+      <article class="intro-card spotlight-card">
+        <div class="intro-top-row">
+          <span class="intro-num">03 / CLEAN &amp; SAFE</span>
+          <span class="intro-chip">VERIFIED</span>
+        </div>
+        <h3>No Viruses. No Hidden Files.</h3>
+        <p>Direct local FFmpeg muxing—no shady redirects, no bundled installers, no trackers.</p>
         <div class="mini-trust-row">
-          <span>Viral Yellow</span>
-          <span>Crimson Pop</span>
+          <span>MP4 / MP3 Only</span>
+          <span>Zero Bloat</span>
         </div>
       </article>
     </section>
@@ -195,65 +197,54 @@
       <div class="studio-grid">
         <div class="preview-card spotlight-card">
           <div class="preview-media-wrap">
-            <video id="videoPreview" class="preview-video" controls playsinline></video>
+            <img id="videoThumb" class="preview-thumb" src="" alt="Video thumbnail" />
             <span class="duration-pill" id="videoDuration">0:00</span>
-            <span class="platform-pill-badge" id="videoPlatform">MP4</span>
+            <span class="platform-pill-badge" id="videoPlatform">YouTube</span>
           </div>
 
-          <h2 class="video-title" id="videoTitle">Podcast Video</h2>
-          <div class="ai-status-pill" id="aiStatusBadge">Checking AI engine...</div>
+          <h2 class="video-title" id="videoTitle">Video Title</h2>
 
-          <div class="ai-controls-box">
-            <div class="control-row">
-              <span class="control-label">CLIP LENGTH</span>
-              <div class="pill-group" data-setting="clip_len">
-                <button type="button" class="pill-opt" data-val="15">15s</button>
-                <button type="button" class="pill-opt active" data-val="30">30s</button>
-                <button type="button" class="pill-opt" data-val="45">45s</button>
-                <button type="button" class="pill-opt" data-val="60">60s</button>
-              </div>
+          <div class="trimmer-box">
+            <div class="trimmer-header">
+              <span class="trimmer-label">Clip Time Range</span>
+              <span class="clip-duration-badge" id="clipDurationBadge">Full Video</span>
             </div>
 
-            <div class="control-row">
-              <span class="control-label">NUMBER OF CLIPS</span>
-              <div class="pill-group" data-setting="num_clips">
-                <button type="button" class="pill-opt" data-val="1">1 Clip</button>
-                <button type="button" class="pill-opt" data-val="2">2 Clips</button>
-                <button type="button" class="pill-opt active" data-val="3">3 Clips</button>
-              </div>
+            <div class="dual-range-wrap">
+              <div class="range-track-bg"></div>
+              <div class="range-track-fill" id="rangeTrackFill"></div>
+              <input type="range" id="startSlider" class="range-input" min="0" max="100" value="0" step="1" />
+              <input type="range" id="endSlider" class="range-input" min="0" max="100" value="100" step="1" />
             </div>
 
-            <div class="control-row">
-              <span class="control-label">9:16 FRAMING</span>
-              <div class="pill-group" data-setting="framing">
-                <button type="button" class="pill-opt active" data-val="blur_bg">Podcast Blur BG</button>
-                <button type="button" class="pill-opt" data-val="crop_9_16">Center Crop</button>
+            <div class="time-inputs-grid">
+              <div class="time-field">
+                <label for="startTimeInput">FROM</label>
+                <input type="text" id="startTimeInput" class="time-text-input" value="0:00" />
               </div>
-            </div>
-
-            <div class="control-row">
-              <span class="control-label">CAPTION STYLE</span>
-              <div class="pill-group" data-setting="caption_style">
-                <button type="button" class="pill-opt active" data-val="viral_yellow">Viral Yellow</button>
-                <button type="button" class="pill-opt" data-val="crimson_pop">Crimson</button>
-                <button type="button" class="pill-opt" data-val="clean_white">White</button>
-                <button type="button" class="pill-opt" data-val="none">Off</button>
+              <div class="time-sep">→</div>
+              <div class="time-field">
+                <label for="endTimeInput">TO</label>
+                <input type="text" id="endTimeInput" class="time-text-input" value="0:00" />
               </div>
-            </div>
-
-            <div class="control-row">
-              <span class="control-label">VISUAL EFFECT</span>
-              <div class="pill-group" data-setting="effect">
-                <button type="button" class="pill-opt active" data-val="cinematic">Cinematic + Bar</button>
-                <button type="button" class="pill-opt" data-val="warm_podcast">Warm + Bar</button>
-                <button type="button" class="pill-opt" data-val="clean">Clean</button>
-              </div>
+              <button type="button" class="btn-reset-trim" id="resetTrimBtn" title="Reset to full video">Reset</button>
             </div>
           </div>
 
-          <button type="button" class="btn-download btn-generate-full" id="generateBtn">
-            <span id="generateBtnLabel">Generate 3 × 30s Clips →</span>
-          </button>
+          <div class="download-action-bar">
+            <div class="selected-info">
+              <span class="selected-kicker">READY TO SAVE</span>
+              <div class="selected-value" id="selectedSummaryText">1080p MP4</div>
+            </div>
+            <button type="button" class="btn-download" id="downloadBtn">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span id="downloadBtnLabel">Download</span>
+            </button>
+          </div>
 
           <div class="progress-hud" id="progressHud" hidden>
             <div class="progress-top">
@@ -264,25 +255,26 @@
               <div class="progress-fill" id="progressFill" style="width: 0%"></div>
             </div>
             <div class="progress-stats">
-              <span id="progressSpeed">Input: —</span>
-              <span id="progressEta">9:16 Reels</span>
+              <span id="progressSpeed">Speed: —</span>
+              <span id="progressEta">ETA: —</span>
             </div>
+            <a href="#" class="btn-save-again" id="saveFileBtn" hidden>
+              Save File Again
+            </a>
           </div>
         </div>
 
         <div class="quality-panel spotlight-card">
           <div class="panel-header">
-            <h3 class="panel-title">Generated Vertical Clips</h3>
-            <span class="clip-duration-badge" id="clipsCountBadge">Ready</span>
+            <h3 class="panel-title">Select Quality</h3>
+            <div class="filter-tabs">
+              <button type="button" class="filter-tab active" data-filter="all">All</button>
+              <button type="button" class="filter-tab" data-filter="video">Video</button>
+              <button type="button" class="filter-tab" data-filter="audio">Audio</button>
+            </div>
           </div>
 
-          <div class="clips-empty-state" id="clipsEmptyState">
-            <div class="empty-reel-icon">9:16</div>
-            <h4>Your AI Reels &amp; Shorts will appear here</h4>
-            <p>Choose clip length, framing, captions, and effects on the left, then hit Generate.</p>
-          </div>
-
-          <div class="clips-gallery" id="clipsGallery"></div>
+          <div class="quality-grid" id="qualityGrid"></div>
         </div>
       </div>
     </section>
@@ -297,11 +289,11 @@
       </div>
     </div>
     <div class="drawer-list" id="historyList">
-      <p class="drawer-empty">No AI clips generated yet.</p>
+      <p class="drawer-empty">No videos yet.</p>
     </div>
   </aside>
   <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
 
-  <script src="/static/app.js?v=13"></script>
+  <script src="/static/app.js?v=11"></script>
 </body>
 </html>
