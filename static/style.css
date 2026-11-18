@@ -1409,26 +1409,105 @@ body.workspace-open .sparkle-accent {
   text-align: center;
 }
 
-/* Studio Dropzone, Video Player & Frame Grabber */
-.drop-zone-bar {
+/* Studio Upload Drop Box, Video Player & Frame Grabber */
+.upload-drop-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 34px 28px;
+  background: rgba(18, 16, 22, 0.84);
+  border: 1.5px dashed rgba(255, 62, 108, 0.42);
+  border-radius: 22px;
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(18px);
   cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, transform 0.18s, box-shadow 0.2s;
 }
 
-.drop-zone-bar.drag-over {
+.upload-drop-box:hover,
+.upload-drop-box.drag-over {
   border-color: var(--accent);
-  box-shadow: 0 0 0 4px var(--accent-dim), 0 24px 58px rgba(0, 0, 0, 0.78);
-  background: rgba(34, 18, 28, 0.94);
+  background: rgba(30, 16, 24, 0.92);
+  box-shadow: 0 0 0 4px var(--accent-dim), 0 26px 60px rgba(0, 0, 0, 0.74);
+  transform: translateY(-2px);
 }
 
-.drop-file-label {
+.upload-icon-ring {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
+  color: var(--accent-soft);
+  box-shadow: 0 0 24px rgba(255, 62, 108, 0.22);
+}
+
+.upload-copy {
+  text-align: center;
+}
+
+.upload-title {
+  font-family: var(--font-display);
+  font-size: 1.18rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.upload-sub {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+/* Compact single-row bar once a video is loaded into workspace */
+.hero-luxury.compact-mode .upload-drop-box {
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 10px 12px 10px 18px;
+  border-radius: 999px;
+  border-style: solid;
+  border-color: var(--border-strong);
+  gap: 12px;
+}
+
+.hero-luxury.compact-mode .upload-icon-ring {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.hero-luxury.compact-mode .upload-icon-ring svg {
+  width: 17px;
+  height: 17px;
+}
+
+.hero-luxury.compact-mode .upload-copy {
   flex: 1;
   min-width: 0;
   text-align: left;
-  color: var(--text-soft);
+}
+
+.hero-luxury.compact-mode .upload-title {
   font-size: 0.92rem;
+  margin-bottom: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.hero-luxury.compact-mode .upload-sub {
+  display: none;
+}
+
+.hero-luxury.compact-mode .upload-cta-btn {
+  padding: 9px 18px;
+  font-size: 0.84rem;
 }
 
 .preview-video {

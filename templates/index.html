@@ -81,18 +81,21 @@
       </div>
 
       <div class="command-bar-wrap">
-        <div class="command-bar drop-zone-bar" id="dropZoneBar" role="button" tabindex="0">
+        <div class="upload-drop-box" id="dropZoneBar" role="button" tabindex="0">
           <input type="file" id="videoFileInput" accept="video/*,.mp4,.mov,.webm,.mkv,.m4v" hidden />
-          <span class="command-icon">
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <div class="upload-icon-ring">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="17 8 12 3 7 8"></polyline>
               <line x1="12" y1="3" x2="12" y2="15"></line>
             </svg>
-          </span>
-          <span class="drop-file-label" id="dropFileLabel">Drop MP4, MOV, WebM or MKV here (up to 150 MB)...</span>
-          <button type="button" class="btn-primary" id="pickFileBtn">
-            <span class="btn-label">Choose Video →</span>
+          </div>
+          <div class="upload-copy">
+            <div class="upload-title" id="dropFileLabel">Drag &amp; drop your video here</div>
+            <div class="upload-sub">MP4, MOV, WebM, MKV • Up to 150 MB • No Login Required</div>
+          </div>
+          <button type="button" class="btn-primary upload-cta-btn" id="pickFileBtn">
+            <span class="btn-label">Upload Video →</span>
           </button>
         </div>
         <div class="error-banner" id="errorBanner" hidden></div>

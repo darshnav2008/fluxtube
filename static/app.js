@@ -212,6 +212,8 @@ function loadVideoFile(file) {
   currentObjectUrl = URL.createObjectURL(file);
 
   dropFileLabel.textContent = `${file.name} (${formatBytesJS(file.size)})`;
+  const pickLabel = pickFileBtn.querySelector(".btn-label");
+  if (pickLabel) pickLabel.textContent = "Change Video";
   videoTitle.textContent = file.name;
   progressHud.hidden = true;
   saveFileBtn.hidden = true;
