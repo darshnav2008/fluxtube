@@ -64,8 +64,6 @@ def detect_platform(url: str) -> str:
         return "Instagram"
     if "tiktok.com" in u:
         return "TikTok"
-    if "reddit.com" in u or "redd.it" in u:
-        return "Reddit"
     if "facebook.com" in u or "fb.watch" in u or "fb.com" in u:
         return "Facebook"
     return "Video Link"
@@ -334,9 +332,9 @@ def get_info():
     data = request.get_json(silent=True) or {}
     url = (data.get("url") or "").strip()
     if not url:
-        return jsonify({"error": "Please paste a valid Instagram, TikTok, Reddit, or Facebook link."}), 400
+        return jsonify({"error": "Please paste a valid Instagram, TikTok, or Facebook link."}), 400
     if is_youtube_url(url):
-        return jsonify({"error": "YouTube is not supported. Please paste an Instagram, TikTok, Reddit, or Facebook video link."}), 400
+        return jsonify({"error": "YouTube is not supported. Please paste an Instagram, TikTok, or Facebook video link."}), 400
 
     ydl_opts = build_base_ydl_opts(None)
     ydl_opts["skip_download"] = True
