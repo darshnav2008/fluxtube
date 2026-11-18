@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.FluxTube" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">#09080B</item>
+        <item name="android:statusBarColor">#09080B</item>
+        <item name="android:navigationBarColor">#09080B</item>
+        <item name="colorPrimary">#FF3E6C</item>
+        <item name="colorAccent">#FF3E6C</item>
+    </style>
+</resources>
