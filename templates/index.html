@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FLUXTUBE — Cinema-Grade YouTube Extractor</title>
+  <title>FLUXTUBE — Cinema-Grade Video Extractor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css?v=11" />
+  <link rel="stylesheet" href="/static/style.css?v=20" />
 </head>
 <body>
   <!-- Dark Obsidian & Luminous Crimson-Rose Arcs Background -->
@@ -60,7 +60,16 @@
         </button>
       </nav>
 
-      <div class="topbar-actions"></div>
+      <div class="topbar-actions">
+        <button type="button" class="btn-cloud-setup" id="settingsToggle" title="YouTube Cloud Bypass &amp; Settings">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+          </svg>
+          <span>Cloud Setup</span>
+          <span class="status-indicator-dot" id="navStatusDot"></span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -84,7 +93,7 @@
         <form class="command-bar" id="analyzeForm">
           <span class="command-icon">
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
             </svg>
           </span>
@@ -200,6 +209,7 @@
             <img id="videoThumb" class="preview-thumb" src="" alt="Video thumbnail" />
             <span class="duration-pill" id="videoDuration">0:00</span>
             <span class="platform-pill-badge" id="videoPlatform">Video</span>
+            <span class="engine-pill-badge" id="engineBadge">Native Engine</span>
           </div>
 
           <h2 class="video-title" id="videoTitle">Video Title</h2>
@@ -262,6 +272,22 @@
               Save File Again
             </a>
           </div>
+
+          <!-- Fast Alternate Download Option for Immediate Browser Saving -->
+          <div class="alt-downloads-panel" id="altDownloadsPanel">
+            <span class="alt-label">Instant Alternate Download:</span>
+            <div class="alt-buttons-row">
+              <a href="#" class="btn-alt-dl" id="altCobaltBtn" target="_blank" rel="noopener noreferrer">
+                <span>⚡ Cobalt Engine</span>
+              </a>
+              <a href="#" class="btn-alt-dl" id="altPipedBtn" target="_blank" rel="noopener noreferrer">
+                <span>📺 Piped Direct</span>
+              </a>
+              <a href="#" class="btn-alt-dl" id="altTenDownBtn" target="_blank" rel="noopener noreferrer">
+                <span>📥 10Downloader</span>
+              </a>
+            </div>
+          </div>
         </div>
 
         <div class="quality-panel spotlight-card">
@@ -294,6 +320,95 @@
   </aside>
   <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
 
-  <script src="/static/app.js?v=14"></script>
+  <!-- Cloud Fix & Settings Modal -->
+  <div class="modal-backdrop" id="settingsBackdrop" hidden></div>
+  <aside class="settings-modal" id="settingsModal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-header">
+      <div class="modal-title-group">
+        <h3 id="modalTitle">Cloud Deployment &amp; YouTube Fix</h3>
+        <p class="modal-subtitle">Bypass YouTube's cloud datacenter bot challenge on Render</p>
+      </div>
+      <button type="button" class="btn-close-modal" id="closeSettingsBtn">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Status Summary Card -->
+      <div class="cloud-status-card">
+        <div class="status-col">
+          <span class="status-col-label">Fallback Engine</span>
+          <span class="status-col-val text-success">Active (Invidious / Piped)</span>
+        </div>
+        <div class="status-col">
+          <span class="status-col-label">YouTube Cookies</span>
+          <span class="status-col-val" id="modalCookieStatus">Checking...</span>
+        </div>
+        <div class="status-col">
+          <span class="status-col-label">Custom Proxy</span>
+          <span class="status-col-val" id="modalProxyStatus">None</span>
+        </div>
+      </div>
+
+      <!-- Quick Explanation in Hinglish -->
+      <div class="modal-info-box">
+        <strong>YouTube block kyun karta hai?</strong> YouTube sabhi cloud datacenter IPs (Render, AWS, GCP) ko bot samajh kar block karta hai. Website me <strong>Auto Fallback Engine</strong> enabled hai, par direct full 4K &amp; fastest server download ke liye neeche Cookies paste karein ya proxy set karein.
+      </div>
+
+      <!-- Option 1: Direct Cookie Paste -->
+      <div class="modal-section">
+        <div class="section-title-row">
+          <span class="section-badge">Option 1</span>
+          <h4>Quick Paste Cookies (Fastest)</h4>
+        </div>
+        <p class="section-desc">Browser se YouTube cookies export karke yahan paste karein aur Save karein:</p>
+        <textarea id="modalCookiesInput" class="modal-textarea" rows="4" placeholder="# Netscape HTTP Cookie File... Paste cookies.txt content here"></textarea>
+        <div class="modal-actions-row">
+          <button type="button" class="btn-primary-sm" id="saveCookiesBtn">Save &amp; Activate Cookies</button>
+          <span class="save-status-msg" id="cookieSaveMsg"></span>
+        </div>
+      </div>
+
+      <!-- Option 2: Render Environment Variable -->
+      <div class="modal-section">
+        <div class="section-title-row">
+          <span class="section-badge">Option 2</span>
+          <h4>Render Dashboard Setup (Permanent)</h4>
+        </div>
+        <div class="steps-list">
+          <div class="step-item">
+            <span class="step-num">1</span>
+            <span>Chrome/Edge me extension install karein: <strong>Get cookies.txt LOCALLY</strong></span>
+          </div>
+          <div class="step-item">
+            <span class="step-num">2</span>
+            <span>YouTube.com open karke extension se cookies export karein.</span>
+          </div>
+          <div class="step-item">
+            <span class="step-num">3</span>
+            <span>Render Dashboard &rarr; <strong>fluxtube</strong> service &rarr; <strong>Environment</strong> &rarr; Add:</span>
+          </div>
+          <div class="step-code">
+            <code>Key: YOUTUBE_COOKIES</code>
+            <code>Value: [Paste exported cookies text]</code>
+          </div>
+        </div>
+      </div>
+
+      <!-- Option 3: Custom Proxy -->
+      <div class="modal-section">
+        <div class="section-title-row">
+          <span class="section-badge">Option 3</span>
+          <h4>Custom Proxy (Optional)</h4>
+        </div>
+        <p class="section-desc">Agar residential proxy use karna chahein (e.g. Webshare / SOCKS5):</p>
+        <div class="proxy-input-group">
+          <input type="text" id="modalProxyInput" class="modal-text-input" placeholder="http://username:password@proxy-host:port" />
+          <button type="button" class="btn-secondary-sm" id="saveProxyBtn">Save Proxy</button>
+        </div>
+        <span class="save-status-msg" id="proxySaveMsg"></span>
+      </div>
+    </div>
+  </aside>
+
+  <script src="/static/app.js?v=20"></script>
 </body>
 </html>

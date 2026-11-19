@@ -8,6 +8,7 @@ const studioWorkspace = document.getElementById("studioWorkspace");
 const videoThumb = document.getElementById("videoThumb");
 const videoDuration = document.getElementById("videoDuration");
 const videoTitle = document.getElementById("videoTitle");
+const engineBadge = document.getElementById("engineBadge");
 
 // Direct Time Trimmer Elements
 const clipDurationBadge = document.getElementById("clipDurationBadge");
@@ -31,6 +32,12 @@ const progressSpeed = document.getElementById("progressSpeed");
 const progressEta = document.getElementById("progressEta");
 const saveFileBtn = document.getElementById("saveFileBtn");
 
+// Alternate Fast Download Links
+const altCobaltBtn = document.getElementById("altCobaltBtn");
+const altPipedBtn = document.getElementById("altPipedBtn");
+const altTenDownBtn = document.getElementById("altTenDownBtn");
+
+// History Drawer
 const historyToggle = document.getElementById("historyToggle");
 const historyDrawer = document.getElementById("historyDrawer");
 const drawerBackdrop = document.getElementById("drawerBackdrop");
@@ -38,6 +45,21 @@ const closeDrawerBtn = document.getElementById("closeDrawerBtn");
 const clearHistoryBtn = document.getElementById("clearHistoryBtn");
 const historyList = document.getElementById("historyList");
 const historyCount = document.getElementById("historyCount");
+
+// Settings Modal & Cloud Fix
+const settingsToggle = document.getElementById("settingsToggle");
+const settingsModal = document.getElementById("settingsModal");
+const settingsBackdrop = document.getElementById("settingsBackdrop");
+const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+const navStatusDot = document.getElementById("navStatusDot");
+const modalCookieStatus = document.getElementById("modalCookieStatus");
+const modalProxyStatus = document.getElementById("modalProxyStatus");
+const modalCookiesInput = document.getElementById("modalCookiesInput");
+const modalProxyInput = document.getElementById("modalProxyInput");
+const saveCookiesBtn = document.getElementById("saveCookiesBtn");
+const saveProxyBtn = document.getElementById("saveProxyBtn");
+const cookieSaveMsg = document.getElementById("cookieSaveMsg");
+const proxySaveMsg = document.getElementById("proxySaveMsg");
 
 let currentVideo = null;
 let selectedQuality = null;
@@ -116,18 +138,39 @@ analyzeForm.addEventListener("submit", (e) => {
 });
 
 function showError(msg) {
-  errorBanner.textContent = msg;
+  errorBanner.innerHTML = "";
+  const span = document.createElement("span");
+  span.textContent = msg;
+  errorBanner.appendChild(span);
+
+  if (msg.includes("restricted") || msg.includes("Cookies") || msg.includes("bot")) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn-open-fix";
+    btn.textContent = "Open Cloud Setup ⚙️";
+    btn.style.marginLeft = "12px";
+    btn.style.padding = "4px 10px";
+    btn.style.borderRadius = "6px";
+    btn.style.background = "var(--accent-grad)";
+    btn.style.color = "#000";
+    btn.style.border = "none";
+    btn.style.fontWeight = "700";
+    btn.style.cursor = "pointer";
+    btn.addEventListener("click", () => toggleSettingsModal(true));
+    errorBanner.appendChild(btn);
+  }
+
   errorBanner.hidden = false;
 }
 
 function clearError() {
   errorBanner.hidden = true;
-  errorBanner.textContent = "";
+  errorBanner.innerHTML = "";
 }
 
 function setInspectLoading(loading) {
   analyzeBtn.disabled = loading;
-  analyzeBtn.querySelector(".btn-label").textContent = loading ? "Loading..." : "Fetch";
+  analyzeBtn.querySelector(".btn-label").textContent = loading ? "Loading..." : "Fetch →";
   analyzeBtn.querySelector(".btn-spinner").hidden = !loading;
 }
 
@@ -227,6 +270,24 @@ function getEffectiveSizeLabel(q) {
   return formatBytesJS(q.size_bytes * ratio);
 }
 
+function updateAlternateLinks(video) {
+  const encUrl = encodeURIComponent(video.webpage_url || "");
+  const vidId = video.id || "";
+
+  if (altCobaltBtn) {
+    altCobaltBtn.href = `https://cobalt.tools/`;
+    altCobaltBtn.title = "Open Cobalt fast downloader";
+  }
+  if (altPipedBtn) {
+    altPipedBtn.href = vidId ? `https://piped.video/watch?v=${vidId}` : `https://piped.video/`;
+    altPipedBtn.title = "Watch or stream via Piped without ads";
+  }
+  if (altTenDownBtn) {
+    altTenDownBtn.href = `https://10downloader.com/download?v=${encUrl}`;
+    altTenDownBtn.title = "Instant browser download via 10Downloader";
+  }
+}
+
 async function inspectUrl(url) {
   if (!url) return;
   clearError();
@@ -253,6 +314,20 @@ async function inspectUrl(url) {
     const platEl = document.getElementById("videoPlatform");
     if (platEl) platEl.textContent = data.platform || "Video";
 
+    if (engineBadge) {
+      if (data.engine === "fallback") {
+        engineBadge.textContent = "⚡ Fallback Engine";
+        engineBadge.classList.add("fallback");
+        engineBadge.title = "Fetched via cloud failover pipeline (Invidious / Piped)";
+      } else {
+        engineBadge.textContent = "Native Engine";
+        engineBadge.classList.remove("fallback");
+        engineBadge.title = "Fetched via high-speed native engine";
+      }
+    }
+
+    updateAlternateLinks(data);
+
     selectedQuality =
       data.qualities.find((q) => q.id === "video_1080") || data.qualities[0] || null;
 
@@ -273,7 +348,7 @@ async function inspectUrl(url) {
 
     saveToHistory(data);
   } catch {
-    showError("Network error while contacting local server.");
+    showError("Network error while contacting download server.");
   } finally {
     setInspectLoading(false);
   }
@@ -346,6 +421,7 @@ downloadBtn.addEventListener("click", async () => {
         duration: currentVideo.duration,
         start_time: startTimeInput.value,
         end_time: endTimeInput.value,
+        engine: currentVideo.engine || "yt-dlp",
       }),
     });
     const data = await res.json();
@@ -404,7 +480,7 @@ downloadBtn.addEventListener("click", async () => {
   }
 });
 
-// History Drawer
+// History Drawer Logic
 const HISTORY_KEY = "fluxtube_history_v1";
 
 function getHistory() {
@@ -472,4 +548,98 @@ clearHistoryBtn.addEventListener("click", () => {
   renderHistory();
 });
 
+// Settings & Cloud Fix Modal Logic
+function toggleSettingsModal(open) {
+  settingsModal.hidden = !open;
+  settingsBackdrop.hidden = !open;
+  if (open) {
+    loadSettings();
+  }
+}
+
+settingsToggle.addEventListener("click", () => toggleSettingsModal(true));
+closeSettingsBtn.addEventListener("click", () => toggleSettingsModal(false));
+settingsBackdrop.addEventListener("click", () => toggleSettingsModal(false));
+
+async function loadSettings() {
+  try {
+    const res = await fetch("/api/settings");
+    const data = await res.json();
+
+    if (modalCookieStatus) {
+      if (data.has_cookies) {
+        modalCookieStatus.textContent = "Loaded & Active ✓";
+        modalCookieStatus.className = "status-col-val text-success";
+      } else {
+        modalCookieStatus.textContent = "Not Set (Fallback Active)";
+        modalCookieStatus.className = "status-col-val";
+      }
+    }
+
+    if (modalProxyStatus) {
+      modalProxyStatus.textContent = data.active_proxy || "None";
+    }
+
+    if (navStatusDot) {
+      if (data.has_cookies || data.has_proxy) {
+        navStatusDot.className = "status-indicator-dot";
+      } else {
+        navStatusDot.className = "status-indicator-dot warning";
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+saveCookiesBtn.addEventListener("click", async () => {
+  const cookies = modalCookiesInput.value.trim();
+  if (!cookies) return;
+
+  saveCookiesBtn.disabled = true;
+  saveCookiesBtn.textContent = "Saving...";
+
+  try {
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cookies }),
+    });
+    const data = await res.json();
+    cookieSaveMsg.textContent = "Cookies saved & activated! ✓";
+    modalCookiesInput.value = "";
+    loadSettings();
+  } catch {
+    cookieSaveMsg.textContent = "Failed to save cookies.";
+  } finally {
+    saveCookiesBtn.disabled = false;
+    saveCookiesBtn.textContent = "Save & Activate Cookies";
+  }
+});
+
+saveProxyBtn.addEventListener("click", async () => {
+  const proxy = modalProxyInput.value.trim();
+
+  saveProxyBtn.disabled = true;
+  saveProxyBtn.textContent = "Saving...";
+
+  try {
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ proxy }),
+    });
+    const data = await res.json();
+    proxySaveMsg.textContent = "Proxy updated! ✓";
+    loadSettings();
+  } catch {
+    proxySaveMsg.textContent = "Failed to save proxy.";
+  } finally {
+    saveProxyBtn.disabled = false;
+    saveProxyBtn.textContent = "Save Proxy";
+  }
+});
+
+// Initialize on page load
 renderHistory();
+loadSettings();
