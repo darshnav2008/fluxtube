@@ -109,27 +109,46 @@ def detect_platform(url: str) -> str:
 
 
 def get_cookiefile_path() -> Optional[str]:
-    """Resolves cookies from Render Secret Files, Env Vars, uploaded UI cookies, or local cookies.txt."""
-    # 1. Render Secret File (/etc/secrets/cookies.txt)
+    """Resolves cookies from Render Secret Files, Env Vars, uploaded UI cookies, or local cookies.txt.
+    Always copies/writes to /tmp to avoid [Errno 30] Read-only file system errors on Render.
+    """
+    raw: Optional[str] = None
+
+    # 1. Render Secret File (/etc/secrets/cookies.txt) - read-only mount on Render
     secret_file = Path("/etc/secrets/cookies.txt")
     if secret_file.is_file() and secret_file.stat().st_size > 50:
-        return str(secret_file)
+        try:
+            raw = secret_file.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            raw = None
 
     # 2. Local cookies.txt in project root
-    local_cookie = BASE_DIR / "cookies.txt"
-    if local_cookie.is_file() and local_cookie.stat().st_size > 50:
-        return str(local_cookie)
+    if not raw:
+        local_cookie = BASE_DIR / "cookies.txt"
+        if local_cookie.is_file() and local_cookie.stat().st_size > 50:
+            try:
+                raw = local_cookie.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                raw = None
 
-    # 3. Cookies uploaded via Web UI (/tmp/fluxtube_cookies.txt)
-    if COOKIE_TMP_PATH.is_file() and COOKIE_TMP_PATH.stat().st_size > 50:
+    # 3. Environment variable YOUTUBE_COOKIES
+    if not raw:
+        env_raw = os.environ.get("YOUTUBE_COOKIES", "").strip()
+        if env_raw and len(env_raw) > 50:
+            raw = env_raw
+
+    # 4. Check if /tmp/fluxtube_cookies.txt already exists from UI upload
+    if not raw and COOKIE_TMP_PATH.is_file() and COOKIE_TMP_PATH.stat().st_size > 50:
         return str(COOKIE_TMP_PATH)
 
-    # 4. Environment variable YOUTUBE_COOKIES
-    raw = os.environ.get("YOUTUBE_COOKIES", "").strip()
-    if raw and len(raw) > 50:
+    if raw:
         normalized = raw.replace("\\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
-        COOKIE_TMP_PATH.write_text(normalized, encoding="utf-8")
-        return str(COOKIE_TMP_PATH)
+        try:
+            COOKIE_TMP_PATH.parent.mkdir(parents=True, exist_ok=True)
+            COOKIE_TMP_PATH.write_text(normalized, encoding="utf-8")
+            return str(COOKIE_TMP_PATH)
+        except OSError:
+            pass
 
     return None
 
